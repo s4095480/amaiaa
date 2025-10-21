@@ -29,6 +29,7 @@
             const [isThinking, setIsThinking] = useState(false);
             const [muted, setMuted] = useState(false);
             const [callTranscript, setCallTranscript] = useState([]);
+            const [error, setError] = useState(null);
             const recognitionRef = useRef(null);
 
             // Initialize speech recognition
@@ -52,12 +53,18 @@
                     recognitionRef.current.onerror = (event) => {
                         console.error('Speech error:', event.error);
                         setIsRecording(false);
+                        setError('Microphone error: ' + event.error);
                     };
+                } else {
+                    console.error('Speech Recognition not supported');
+                    setError('Speech Recognition not supported in this browser');
                 }
             }, []);
 
             const handleUserSpeech = async (transcript) => {
                 if (!transcript.trim()) return;
+
+                console.log('User speech transcribed:', transcript);
 
                 // Add user message
                 setCallTranscript(prev => [...prev, {
@@ -68,20 +75,38 @@
                 }]);
 
                 setIsThinking(true);
+                setError(null);
 
                 try {
-                    // Call backend
                     const response = await fetch('/api/chat', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ message: transcript })
                     });
 
-                    const data = await response.json();
-                    console.log('Response:', data);
+                    console.log('Response status:', response.status);
+                    const responseText = await response.text();
+                    console.log('Raw response:', responseText);
+
+                    if (!response.ok) {
+                        throw new Error(`Backend error: ${response.status} - ${responseText}`);
+                    }
+
+                    let data;
+                    try {
+                        data = JSON.parse(responseText);
+                    } catch (e) {
+                        console.error('JSON parse error:', e);
+                        throw new Error('Invalid response format from server');
+                    }
+
+                    console.log('Backend response:', data);
+
+                    if (data.error) {
+                        throw new Error(data.error);
+                    }
 
                     if (data.reply) {
-                        // Add Amaia's response
                         setCallTranscript(prev => [...prev, {
                             id: Date.now() + 1,
                             sender: 'amaia',
@@ -89,14 +114,27 @@
                             time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                         }]);
 
-                        // Play voice
                         if (!muted && data.audioUrl) {
+                            console.log('Playing audio:', data.audioUrl);
                             const audio = new Audio(data.audioUrl);
-                            audio.play();
+                            audio.play().catch(e => {
+                                console.error('Audio play error:', e);
+                                setError('Failed to play audio');
+                            });
                         }
+                    } else {
+                        console.warn('No reply in response');
+                        setError('No response from Amaia');
                     }
                 } catch (error) {
-                    console.error('Error:', error);
+                    console.error('Chat error:', error);
+                    setError(error.message);
+                    setCallTranscript(prev => [...prev, {
+                        id: Date.now() + 1,
+                        sender: 'amaia',
+                        text: 'Sorry, I had trouble hearing that. Try again?',
+                        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                    }]);
                 } finally {
                     setIsThinking(false);
                 }
@@ -130,6 +168,7 @@
                 setCurrentPage('intro');
                 setCallTranscript([]);
                 stopListening();
+                setError(null);
             };
 
             // INTRO PAGE
@@ -152,11 +191,11 @@
 
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
                                 <div style={{ width: '8px', height: '8px', background: '#4ade80', borderRadius: '9999px' }} className="animate-pulse" />
-                                <p style={{ fontSize: '12px', color: '#9ca3af' }}>live voice call</p>
+                                <p style={{ fontSize: '12px', color: '#9ca3af' }}>live voice chat</p>
                             </div>
 
                             <div style={{ display: 'flex', gap: '16px', justifyContent: 'center' }}>
-                                <button onClick={startCall} style={{ padding: '16px 48px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '9999px', fontWeight: 600, cursor: 'pointer', fontSize: '16px', boxShadow: '0 0 20px rgba(22, 163, 74, 0.5)' }}>
+                                <button onClick={startCall} style={{ padding: '16px 48px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '9999px', fontWeight: '600', cursor: 'pointer', fontSize: '16px', boxShadow: '0 0 20px rgba(22, 163, 74, 0.5)' }}>
                                     📞 Answer
                                 </button>
                             </div>
@@ -173,7 +212,6 @@
             if (currentPage === 'call') {
                 return (
                     <div style={{ minHeight: '100vh', background: 'linear-gradient(to bottom, #030712, #000)', color: '#fff', display: 'flex', flexDirection: 'column' }}>
-                        {/* Header */}
                         <div style={{ position: 'sticky', top: 0, zIndex: 40, background: 'rgba(0, 0, 0, 0.8)', backdropFilter: 'blur(12px)', borderBottom: '1px solid #1f2937' }}>
                             <div style={{ maxWidth: '1024px', margin: '0 auto', padding: '0 16px', height: '64px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                 <div style={{ textAlign: 'center', flex: 1 }}>
@@ -189,7 +227,6 @@
                             </div>
                         </div>
 
-                        {/* Main content */}
                         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 16px', gap: '48px' }}>
                             <div style={{ position: 'relative' }}>
                                 <div style={{ width: '128px', height: '128px', borderRadius: '9999px', background: 'linear-gradient(135deg, #ec4899, #a855f7)', boxShadow: '0 0 50px rgba(236, 72, 153, 0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px' }} className={isRecording ? 'animate-pulse' : isThinking ? 'animate-bounce' : ''}>
@@ -204,6 +241,7 @@
                                 {isRecording && <p style={{ color: '#f472b6', fontSize: '14px', fontWeight: 500 }} className="animate-pulse">Listening...</p>}
                                 {isThinking && <p style={{ color: '#c084fc', fontSize: '14px', fontWeight: 500 }} className="animate-pulse">Amaia is thinking...</p>}
                                 {!isRecording && !isThinking && <p style={{ color: '#9ca3af', fontSize: '14px' }}>Ready to listen</p>}
+                                {error && <p style={{ color: '#dc2626', fontSize: '14px', fontWeight: 500 }}>{error}</p>}
                             </div>
 
                             {callTranscript.length > 1 && (
@@ -228,7 +266,7 @@
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
-                                    transform: isRecording ? 'scale(1.1)' : 'scale(1)',
+                                    transform: 'scale(1)',
                                     background: isRecording ? '#dc2626' : '#ec4899',
                                     border: 'none',
                                     color: '#fff',
@@ -242,7 +280,6 @@
                             </button>
                         </div>
 
-                        {/* Transcript */}
                         <div style={{ background: 'rgba(0, 0, 0, 0.5)', borderTop: '1px solid #1f2937', padding: '24px 16px', maxHeight: '192px', overflowY: 'auto' }}>
                             <p style={{ fontSize: '12px', color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '16px' }}>Call History</p>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
