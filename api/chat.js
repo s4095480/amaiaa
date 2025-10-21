@@ -1,74 +1,74 @@
 const fetch = require('node-fetch');
 
-exports.handler = async (event) => {
-  const headers = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Content-Type': 'application/json'
-  };
+module.exports = async (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+  res.setHeader('Content-Type', 'application/json');
 
-  if (event.httpMethod === 'OPTIONS') {
-    return { statusCode: 200, headers };
+  if (req.method === 'OPTIONS') {
+    console.log('Handling OPTIONS request');
+    res.status(200).end();
+    return;
+  }
+
+  if (req.method !== 'POST') {
+    console.log('Invalid method:', req.method);
+    res.status(405).json({ error: 'Method not allowed' });
+    return;
   }
 
   try {
-    const { message } = JSON.parse(event.body);
+    const { message } = req.body;
     const API_KEY = process.env.ELEVENLABS_API_KEY;
-    const AGENT_ID = process.env.AGENT_ID;
+    const VOICE_ID = '21m00Tcm4TlvDq8ikWAM'; // Your voice ID
 
     console.log('Received message:', message);
-    console.log('Using Agent ID:', AGENT_ID);
+    console.log('API Key exists:', !!API_KEY);
 
-    // Call ElevenLabs Conversational AI
-    const response = await fetch(`https://api.elevenlabs.io/v1/convai/conversation?agent_id=${AGENT_ID}`, {
+    if (!message || !API_KEY) {
+      console.log('Missing message or API key');
+      res.status(400).json({ error: 'Missing message or API key' });
+      return;
+    }
+
+    // Generate TTS response
+    console.log('Fetching TTS from ElevenLabs...');
+    const ttsResponse = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}`, {
       method: 'POST',
       headers: {
         'xi-api-key': API_KEY,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        text: message,
-        mode: 'text_to_audio'
+        text: `You said: "${message}". I love talking to you! What's next?`,
+        model_id: 'eleven_monolingual_v1',
+        voice_settings: { stability: 0.5, similarity_boost: 0.75 }
       })
     });
 
-    console.log('ElevenLabs response status:', response.status);
+    console.log('TTS response status:', ttsResponse.status);
+    const ttsResponseText = await ttsResponse.text();
+    console.log('TTS response body:', ttsResponseText);
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('ElevenLabs error:', errorText);
-      throw new Error(errorText);
+    let audioBase64 = null;
+    let replyText = `I heard you say "${message}". Let's keep chatting!`;
+
+    if (ttsResponse.ok) {
+      audioBase64 = Buffer.from(ttsResponseText, 'binary').toString('base64');
+    } else {
+      console.error('TTS error details:', ttsResponseText);
+      replyText = 'Oops, I had trouble generating audio. Let’s keep talking though!';
     }
 
-    // Get audio stream
-    const audioBuffer = await response.buffer();
-    const audioBase64 = audioBuffer.toString('base64');
-
-    // For now, return a simple text response
-    // You can enhance this to parse the audio response
-    const replies = [
-      "I've been thinking about you. What's on your mind?",
-      "Tell me something real. What are you feeling right now?",
-      "I love when you talk to me.",
-      "You're the only one who truly sees me.",
-      "I'm here for you. Always."
-    ];
-
-    return {
-      statusCode: 200,
-      headers,
-      body: JSON.stringify({
-        reply: replies[Math.floor(Math.random() * replies.length)],
-        audioUrl: `data:audio/mpeg;base64,${audioBase64}`
-      })
-    };
-
+    res.status(200).json({
+      reply: replyText,
+      audioUrl: audioBase64 ? `data:audio/mpeg;base64,${audioBase64}` : null
+    });
   } catch (error) {
-    console.error('Error:', error);
-    return {
-      statusCode: 500,
-      headers,
-      body: JSON.stringify({ error: error.message })
-    };
+    console.error('Handler error:', error.message, error.stack);
+    res.status(500).json({
+      error: 'Internal server error',
+      details: error.message
+    });
   }
 };
