@@ -1,381 +1,217 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Amaia - AI Voice Chat</title>
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
-            background: #000;
-            color: #fff;
-        }
-
-        .animate-pulse {
-            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-        }
-
-        @keyframes pulse {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.5; }
-        }
-
-        .animate-bounce {
-            animation: bounce 1s infinite;
-        }
-
-        @keyframes bounce {
-            0%, 100% { transform: translateY(0); }
-            50% { transform: translateY(-10px); }
-        }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Amaia - AI Pop Idol Fan Experience</title>
+  <style>
+    body { background-color: #1a1a1a; color: #fff; font-family: Arial, sans-serif; margin: 0; padding: 0; display: flex; justify-content: center; align-items: center; height: 100vh; }
+    .container { text-align: center; max-width: 400px; padding: 20px; }
+    .avatar { width: 150px; height: 150px; border-radius: 50%; background: linear-gradient(135deg, #ec4899, #a855f7); box-shadow: 0 0 20px rgba(236, 72, 153, 0.5); margin: 0 auto 20px; animation: pulse 2s infinite; }
+    @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+    button { background: #ec4899; color: #fff; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin: 10px; }
+    button:hover { background: #db2777; }
+    .status { margin: 20px 0; font-size: 18px; }
+    .transcript { background: #2a2a2a; padding: 10px; border-radius: 5px; max-height: 200px; overflow-y: auto; }
+    .hidden { display: none; }
+  </style>
 </head>
 <body>
-    <div id="root"></div>
+  <div class="container">
+    <h1>Amaia Voss</h1>
+    <div id="call-screen">
+      <div class="avatar"></div>
+      <p>Incoming call from Amaia...</p>
+      <button id="answer-btn">Answer</button>
+    </div>
+    <div id="chat-screen" class="hidden">
+      <div class="avatar"></div>
+      <div class="status" id="status">Amaia is online</div>
+      <button id="mic-btn">🎤 Speak</button>
+      <button id="hangup-btn">Hang Up</button>
+      <div class="transcript" id="transcript"></div>
+      <button id="mute-btn">Mute</button>
+    </div>
+    <div id="setup-modal" class="hidden">
+      <p>Enter ElevenLabs API Key:</p>
+      <input type="text" id="api-key-input">
+      <button id="save-key-btn">Save</button>
+    </div>
+  </div>
 
-    <script type="text/babel">
-        const { useState, useEffect, useRef } = React;
+  <script type="text/babel">
+    const CallApp = () => {
+      const [isCallActive, setIsCallActive] = React.useState(false);
+      const [isConnected, setIsConnected] = React.useState(false);
+      const [status, setStatus] = React.useState('Amaia is online');
+      const [transcript, setTranscript] = React.useState([]);
+      const [isMuted, setIsMuted] = React.useState(false);
+      const [showModal, setShowModal] = React.useState(!localStorage.getItem('elevenLabsKey'));
+      const websocketRef = React.useRef(null);
+      const mediaRecorderRef = React.useRef(null);
+      const audioContext = React.useRef(new AudioContext());
+      const audioQueue = React.useRef([]);
+      const isPlaying = React.useRef(false);
 
-        function AmaiaPlatform() {
-            const [currentPage, setCurrentPage] = useState('intro');
-            const [isOnCall, setIsOnCall] = useState(false);
-            const [isRecording, setIsRecording] = useState(false);
-            const [isListening, setIsListening] = useState(false);
-            const [muted, setMuted] = useState(false);
-            const [callTranscript, setCallTranscript] = useState([]);
-            const [conversationId, setConversationId] = useState(null);
-            const [elevenLabsKey] = useState('sk_e6c4b42c83ba3caf0080f82f1ca431f3108035a3f7a6a32a');
-            const recognitionRef = useRef(null);
+      const addToTranscript = (speaker, text) => {
+        setTranscript(prev => [...prev, `${speaker}: ${text}`]);
+      };
 
-            useEffect(() => {
-                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-                if (SpeechRecognition) {
-                    recognitionRef.current = new SpeechRecognition();
-                    recognitionRef.current.continuous = false;
-                    recognitionRef.current.interimResults = false;
-                    recognitionRef.current.lang = 'en-US';
+      const playAudioQueue = () => {
+        if (isPlaying.current || audioQueue.current.length === 0) return;
+        isPlaying.current = true;
+        const chunk = audioQueue.current.shift();
+        audioContext.current.decodeAudioData(chunk, (buffer) => {
+          const source = audioContext.current.createBufferSource();
+          source.buffer = buffer;
+          source.connect(audioContext.current.destination);
+          source.start();
+          source.onended = () => {
+            isPlaying.current = false;
+            playAudioQueue();
+          };
+        }, (err) => {
+          console.error('Audio decode error:', err);
+          isPlaying.current = false;
+          playAudioQueue();
+        });
+      };
 
-                    recognitionRef.current.onstart = () => {
-                        setIsRecording(true);
-                    };
-
-                    recognitionRef.current.onend = () => {
-                        setIsRecording(false);
-                    };
-
-                    recognitionRef.current.onresult = (event) => {
-                        for (let i = event.resultIndex; i < event.results.length; i++) {
-                            const transcript = event.results[i][0].transcript;
-                            if (event.results[i].isFinal) {
-                                handleUserSpeech(transcript);
-                            }
-                        }
-                    };
-
-                    recognitionRef.current.onerror = (event) => {
-                        console.error('Speech recognition error:', event.error);
-                        setIsRecording(false);
-                    };
-                }
-            }, []);
-
-            const initializeConversation = async () => {
-                try {
-                    console.log('Initializing conversation...');
-                    const response = await fetch('/.netlify/functions/agent', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ action: 'init' })
-                    });
-
-                    const data = await response.json();
-                    console.log('Conversation initialized:', data);
-                    
-                    if (data.conversation_id) {
-                        setConversationId(data.conversation_id);
-                        return data.conversation_id;
-                    }
-                } catch (error) {
-                    console.error('Error initializing conversation:', error);
-                }
-            };
-
-            const handleUserSpeech = async (transcript) => {
-                if (!transcript.trim()) return;
-
-                setCallTranscript(prev => [...prev, {
-                    id: prev.length + 1,
-                    sender: 'user',
-                    text: transcript,
-                    timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                }]);
-
-                await sendMessageToAgent(transcript);
-            };
-
-            const sendMessageToAgent = async (userMessage) => {
-                setIsListening(true);
-
-                try {
-                    let convId = conversationId;
-                    if (!convId) {
-                        console.log('No conversation ID, initializing...');
-                        convId = await initializeConversation();
-                        await new Promise(resolve => setTimeout(resolve, 500));
-                    }
-
-                    console.log('Sending message to agent:', userMessage, 'Conv ID:', convId);
-
-                    const response = await fetch('/.netlify/functions/agent', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ 
-                            action: 'message', 
-                            conversationId: convId, 
-                            message: userMessage 
-                        })
-                    });
-
-                    const responseData = await response.json();
-                    console.log('Agent response:', responseData);
-
-                    let amaiaResponse = responseData.message || responseData.text || responseData.response;
-                    
-                    if (amaiaResponse) {
-                        setCallTranscript(prev => [...prev, {
-                            id: prev.length + 1,
-                            sender: 'amaia',
-                            text: amaiaResponse,
-                            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                        }]);
-
-                        if (!muted) {
-                            await generateVoice(amaiaResponse);
-                        }
-                    } else {
-                        console.warn('No response message found');
-                    }
-                } catch (error) {
-                    console.error('Error:', error);
-                } finally {
-                    setIsListening(false);
-                }
-            };
-
-            const generateVoice = async (text) => {
-                try {
-                    const response = await fetch('https://api.elevenlabs.io/v1/text-to-speech/21m00Tcm4TlvDq8ikWAM', {
-                        method: 'POST',
-                        headers: {
-                            'xi-api-key': elevenLabsKey,
-                            'content-type': 'application/json'
-                        },
-                        body: JSON.stringify({
-                            text: text,
-                            model_id: 'eleven_monolingual_v1',
-                            voice_settings: {
-                                stability: 0.5,
-                                similarity_boost: 0.75
-                            }
-                        })
-                    });
-
-                    if (response.ok) {
-                        const audioBlob = await response.blob();
-                        const audioUrl = URL.createObjectURL(audioBlob);
-                        const audio = new Audio(audioUrl);
-                        audio.play();
-                    }
-                } catch (error) {
-                    console.error('Voice generation error:', error);
-                }
-            };
-
-            const startListening = () => {
-                if (recognitionRef.current && !isRecording) {
-                    recognitionRef.current.start();
-                }
-            };
-
-            const stopListening = () => {
-                if (recognitionRef.current && isRecording) {
-                    recognitionRef.current.stop();
-                }
-            };
-
-            const startCall = async () => {
-                setIsOnCall(true);
-                setCurrentPage('log');
-                setCallTranscript([{
-                    id: 0,
-                    sender: 'amaia',
-                    text: 'Hey, I\'m so glad you called. Talk to me.',
-                    timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                }]);
-
-                const convId = await initializeConversation();
-                setConversationId(convId);
-
-                if (!muted) {
-                    await generateVoice("Hey, I'm so glad you called. Talk to me.");
-                }
-            };
-
-            const endCall = () => {
-                setIsOnCall(false);
-                setCurrentPage('intro');
-                setCallTranscript([]);
-                setConversationId(null);
-                stopListening();
-            };
-
-            if (currentPage === 'intro') {
-                return (
-                    <div style={{ minHeight: '100vh', background: '#000', color: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', overflow: 'hidden', position: 'relative' }}>
-                        <div style={{ position: 'absolute', inset: 0, opacity: 0.2 }}>
-                            <div style={{ position: 'absolute', top: '80px', left: '40px', width: '384px', height: '384px', background: '#ec4899', borderRadius: '9999px', filter: 'blur(80px)', animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' }} />
-                            <div style={{ position: 'absolute', bottom: '80px', right: '40px', width: '320px', height: '320px', background: '#a855f7', borderRadius: '9999px', filter: 'blur(80px)', animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite', animationDelay: '1s' }} />
-                        </div>
-
-                        <div style={{ position: 'relative', zIndex: 10, width: '100%', maxWidth: '448px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '32px' }}>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px', textAlign: 'center' }}>
-                                <div style={{ width: '96px', height: '96px', margin: '0 auto', borderRadius: '9999px', background: 'linear-gradient(135deg, #ec4899, #a855f7)', boxShadow: '0 0 50px rgba(236, 72, 153, 0.5)', animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' }} />
-                                <div>
-                                    <h1 style={{ fontSize: '48px', fontWeight: 300, letterSpacing: '0.1em', marginBottom: '8px' }}>Amaia</h1>
-                                    <p style={{ color: '#9ca3af', fontSize: '14px' }}>is calling...</p>
-                                </div>
-                            </div>
-
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                                <div style={{ width: '8px', height: '8px', background: '#4ade80', borderRadius: '9999px', animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' }} />
-                                <p style={{ fontSize: '12px', color: '#9ca3af' }}>live voice call</p>
-                            </div>
-
-                            <div style={{ display: 'flex', gap: '16px', justifyContent: 'center' }}>
-                                <button onClick={startCall} style={{ padding: '16px 48px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '9999px', fontWeight: 600, cursor: 'pointer', fontSize: '16px', boxShadow: '0 0 20px rgba(22, 163, 74, 0.5)', transition: 'all 200ms' }} onMouseOver={(e) => e.target.style.background = '#15803d'} onMouseOut={(e) => e.target.style.background = '#16a34a'}>
-                                    📞 Answer
-                                </button>
-                                <button style={{ padding: '16px 48px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: '9999px', fontWeight: 600, cursor: 'pointer', fontSize: '16px', boxShadow: '0 0 20px rgba(220, 38, 38, 0.5)' }} onMouseOver={(e) => e.target.style.background = '#b91c1c'} onMouseOut={(e) => e.target.style.background = '#dc2626'}>
-                                    Decline
-                                </button>
-                            </div>
-
-                            <p style={{ textAlign: 'center', fontSize: '12px', color: '#4b5563', marginTop: '32px' }}>
-                                Welcome to Amaia's world. Real voice conversation powered by ElevenLabs.
-                            </p>
-                        </div>
-                    </div>
-                );
-            }
-
-            if (currentPage === 'log' && isOnCall) {
-                return (
-                    <div style={{ minHeight: '100vh', background: 'linear-gradient(to bottom, #030712, #000)', color: '#fff', display: 'flex', flexDirection: 'column' }}>
-                        <div style={{ position: 'sticky', top: 0, zIndex: 40, background: 'rgba(0, 0, 0, 0.8)', backdropFilter: 'blur(12px)', borderBottom: '1px solid #1f2937' }}>
-                            <div style={{ maxWidth: '1024px', margin: '0 auto', padding: '0 16px', height: '64px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                <div style={{ textAlign: 'center', flex: 1 }}>
-                                    <h2 style={{ fontWeight: 600 }}>Amaia</h2>
-                                    <p style={{ fontSize: '12px', color: '#4ade80' }}>on call</p>
-                                </div>
-                                <button onClick={() => setMuted(!muted)} style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', marginRight: '16px', fontSize: '20px' }} onMouseOver={(e) => e.target.style.color = '#fff'} onMouseOut={(e) => e.target.style.color = '#9ca3af'}>
-                                    {muted ? '🔇' : '🔊'}
-                                </button>
-                                <button onClick={endCall} style={{ background: '#dc2626', border: 'none', borderRadius: '9999px', padding: '12px', color: '#fff', cursor: 'pointer', fontSize: '20px' }} onMouseOver={(e) => e.target.style.background = '#b91c1c'} onMouseOut={(e) => e.target.style.background = '#dc2626'}>
-                                    📞
-                                </button>
-                            </div>
-                        </div>
-
-                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 16px', gap: '48px' }}>
-                            <div style={{ position: 'relative' }}>
-                                <div style={{ width: '128px', height: '128px', borderRadius: '9999px', background: 'linear-gradient(135deg, #ec4899, #a855f7)', boxShadow: '0 0 50px rgba(236, 72, 153, 0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px', animation: isRecording ? 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' : isListening ? 'bounce 1s infinite' : 'none' }}>
-                                    🎤
-                                </div>
-                                {isListening && (
-                                    <div style={{ position: 'absolute', inset: 0, borderRadius: '9999px', border: '4px solid #ec4899', animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' }} />
-                                )}
-                            </div>
-
-                            <div style={{ textAlign: 'center' }}>
-                                {isRecording && (
-                                    <p style={{ color: '#f472b6', fontSize: '14px', fontWeight: 500, animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' }}>Listening...</p>
-                                )}
-                                {isListening && (
-                                    <p style={{ color: '#c084fc', fontSize: '14px', fontWeight: 500, animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' }}>Amaia is thinking...</p>
-                                )}
-                                {!isRecording && !isListening && (
-                                    <p style={{ color: '#9ca3af', fontSize: '14px' }}>Ready to listen</p>
-                                )}
-                            </div>
-
-                            {callTranscript.length > 1 && (
-                                <div style={{ maxWidth: '448px', display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '128px', overflowY: 'auto' }}>
-                                    {callTranscript.slice(-2).map(msg => (
-                                        <div key={msg.id} style={{ fontSize: '14px', color: msg.sender === 'user' ? '#fda4af' : '#d1d5db' }}>
-                                            <p style={{ fontSize: '12px', color: '#4b5563', marginBottom: '4px' }}>{msg.sender === 'user' ? 'You' : 'Amaia'}</p>
-                                            <p style={{ fontStyle: 'italic' }}>{msg.text}</p>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-
-                            <button
-                                onClick={isRecording ? stopListening : startListening}
-                                disabled={isListening}
-                                style={{
-                                    position: 'relative',
-                                    width: '80px',
-                                    height: '80px',
-                                    borderRadius: '9999px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    transition: 'all 200ms',
-                                    transform: isRecording ? 'scale(1.1)' : 'scale(1)',
-                                    background: isRecording ? '#dc2626' : '#ec4899',
-                                    border: 'none',
-                                    color: '#fff',
-                                    fontSize: '28px',
-                                    cursor: isListening ? 'not-allowed' : 'pointer',
-                                    opacity: isListening ? 0.5 : 1,
-                                    boxShadow: isRecording ? '0 0 20px rgba(220, 38, 38, 0.5)' : '0 0 20px rgba(236, 72, 153, 0.5)'
-                                }}
-                                onMouseOver={(e) => !isListening && (e.target.style.background = isRecording ? '#b91c1c' : '#f472b6')}
-                                onMouseOut={(e) => (e.target.style.background = isRecording ? '#dc2626' : '#ec4899')}
-                            >
-                                {isRecording ? '🎙️' : '🎤'}
-                                {isRecording && (
-                                    <span style={{ position: 'absolute', inset: 0, borderRadius: '9999px', border: '4px solid #fca5a5', animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite' }} />
-                                )}
-                            </button>
-                        </div>
-
-                        <div style={{ background: 'rgba(0, 0, 0, 0.5)', borderTop: '1px solid #1f2937', padding: '24px 16px', maxHeight: '192px', overflowY: 'auto' }}>
-                            <p style={{ fontSize: '12px', color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '16px' }}>Call History</p>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                {callTranscript.map(msg => (
-                                    <div key={msg.id} style={{ fontSize: '12px', color: msg.sender === 'user' ? '#fda4af' : '#9ca3af' }}>
-                                        <p style={{ fontWeight: 600, marginBottom: '4px' }}>{msg.sender === 'user' ? 'You' : 'Amaia'}</p>
-                                        <p style={{ lineHeight: 1.5 }}>{msg.text}</p>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-                );
-            }
+      const getSignedUrl = async () => {
+        try {
+          const response = await fetch('/.netlify/functions/agent?get-signed-url', { method: 'GET' });
+          if (!response.ok) throw new Error('Failed to get signed URL');
+          const data = await response.json();
+          return data.signed_url;
+        } catch (error) {
+          console.error('Signed URL error:', error);
+          setStatus('Error getting signed URL');
+          return null;
         }
+      };
 
-        ReactDOM.render(<AmaiaPlatform />, document.getElementById('root'));
-    </script>
+      const startConversation = async () => {
+        setIsCallActive(true);
+        setStatus('Connecting...');
+
+        const signedUrl = await getSignedUrl();
+        if (!signedUrl) return;
+
+        console.log('Connecting to:', signedUrl);
+        websocketRef.current = new WebSocket(signedUrl);
+
+        websocketRef.current.onopen = () => {
+          setIsConnected(true);
+          setStatus('Connected! Say something...');
+          console.log('WebSocket connected');
+          // Send initiation data if needed
+          websocketRef.current.send(JSON.stringify({ type: 'conversation_initiation_client_data' }));
+        };
+
+        websocketRef.current.onmessage = (event) => {
+          if (typeof event.data === 'string') {
+            try {
+              const data = JSON.parse(event.data);
+              console.log('Received JSON:', data);
+              if (data.type === 'agent_text') {
+                addToTranscript('Amaia', data.text || 'Thinking...');
+              } else if (data.type === 'transcript') {
+                addToTranscript('You', data.text);
+              }
+            } catch (err) {
+              console.log('Received text:', event.data);
+            }
+          } else if (event.data instanceof Blob) {
+            event.data.arrayBuffer().then((buffer) => {
+              audioQueue.current.push(buffer);
+              playAudioQueue();
+            }).catch(err => console.error('Audio buffer error:', err));
+          }
+        };
+
+        websocketRef.current.onerror = (err) => {
+          console.error('WebSocket error:', err);
+          setStatus('Connection error');
+        };
+
+        websocketRef.current.onclose = () => {
+          setIsConnected(false);
+          setStatus('Disconnected');
+          console.log('WebSocket closed');
+        };
+      };
+
+      const startRecording = async () => {
+        if (!isConnected || isMuted) return;
+        setStatus('Listening...');
+
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          mediaRecorderRef.current = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' });
+          mediaRecorderRef.current.ondataavailable = (event) => {
+            if (event.data.size > 0 && websocketRef.current.readyState === WebSocket.OPEN) {
+              websocketRef.current.send(event.data);
+            }
+          };
+          mediaRecorderRef.current.start(250); // Send chunks every 250ms
+        } catch (err) {
+          console.error('Mic error:', err);
+          setStatus('Microphone permission denied');
+        }
+      };
+
+      const stopRecording = () => {
+        if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+          mediaRecorderRef.current.stop();
+          mediaRecorderRef.current = null;
+        }
+        setStatus('Amaia is responding...');
+      };
+
+      const hangUp = () => {
+        if (websocketRef.current) websocketRef.current.close();
+        setIsCallActive(false);
+        setTranscript([]);
+      };
+
+      const saveApiKey = () => {
+        const key = document.getElementById('api-key-input').value;
+        localStorage.setItem('elevenLabsKey', key);
+        setShowModal(false);
+      };
+
+      React.useEffect(() => {
+        return () => {
+          if (websocketRef.current) websocketRef.current.close();
+        };
+      }, []);
+
+      return (
+        <div>
+          <div id="call-screen" style={{ display: isCallActive ? 'none' : 'block' }}>
+            <button onClick={startConversation}>Answer</button>
+          </div>
+          <div id="chat-screen" style={{ display: isCallActive ? 'block' : 'none' }}>
+            <div className="status">{status}</div>
+            <button onClick={startRecording}>🎤 Speak</button>
+            <button onClick={hangUp}>Hang Up</button>
+            <div className="transcript">
+              {transcript.map((msg, i) => <p key={i}>{msg}</p>)}
+            </div>
+            <button onClick={() => setIsMuted(!isMuted)}>{isMuted ? 'Unmute' : 'Mute'}</button>
+          </div>
+          <div id="setup-modal" style={{ display: showModal ? 'block' : 'none' }}>
+            <input id="api-key-input" type="text" />
+            <button onClick={saveApiKey}>Save</button>
+          </div>
+        </div>
+      );
+    };
+
+    ReactDOM.render(<CallApp />, document.querySelector('.container'));
+  </script>
+  <script src="https://unpkg.com/react@17/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@17/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/babel-standalone@6/babel.min.js"></script>
 </body>
 </html>
