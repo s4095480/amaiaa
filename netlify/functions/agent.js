@@ -9,6 +9,7 @@ exports.handler = async (event) => {
   };
 
   if (event.httpMethod === 'OPTIONS') {
+    console.log('Handling OPTIONS request');
     return { statusCode: 200, headers };
   }
 
@@ -17,10 +18,12 @@ exports.handler = async (event) => {
 
   console.log('API Key exists:', !!API_KEY);
   console.log('Agent ID:', AGENT_ID);
+  console.log('Event path:', event.path);
+  console.log('Event method:', event.httpMethod);
 
   try {
     if (event.httpMethod === 'GET' && event.path.includes('get-signed-url')) {
-      console.log('Generating signed URL...');
+      console.log('Generating signed URL for agent:', AGENT_ID);
 
       const response = await fetch(`https://api.elevenlabs.io/v1/convai/conversation/get-signed-url?agent_id=${AGENT_ID}`, {
         method: 'GET',
@@ -55,7 +58,7 @@ exports.handler = async (event) => {
       body: JSON.stringify({ error: 'Invalid request' })
     };
   } catch (error) {
-    console.error('Error:', error);
+    console.error('Function error:', error);
     return {
       statusCode: 500,
       headers,
