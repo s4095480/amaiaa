@@ -109,10 +109,49 @@
                 }
             };
 
+            const createWavBlob = (pcmData) => {
+                const sampleRate = 16000;
+                const numChannels = 1;
+                const bitsPerSample = 16;
+                const byteRate = sampleRate * numChannels * bitsPerSample / 8;
+                const blockAlign = numChannels * bitsPerSample / 8;
+                const dataSize = pcmData.length;
+                const buffer = new ArrayBuffer(44 + dataSize);
+                const view = new DataView(buffer);
+
+                // WAV Header
+                view.setUint32(0, 0x52494646, false); // "RIFF"
+                view.setUint32(4, 36 + dataSize, true); // Chunk size
+                view.setUint32(8, 0x57415645, false); // "WAVE"
+                view.setUint32(12, 0x666d7420, false); // "fmt "
+                view.setUint32(16, 16, true); // Subchunk1Size (16 for PCM)
+                view.setUint16(20, 1, true); // AudioFormat (1 for PCM)
+                view.setUint16(22, numChannels, true); // NumChannels
+                view.setUint32(24, sampleRate, true); // SampleRate
+                view.setUint32(28, byteRate, true); // ByteRate
+                view.setUint16(32, blockAlign, true); // BlockAlign
+                view.setUint16(34, bitsPerSample, true); // BitsPerSample
+                view.setUint32(36, 0x64617461, false); // "data"
+                view.setUint32(40, dataSize, true); // Subchunk2Size
+
+                // PCM Data
+                for (let i = 0; i < pcmData.length; i++) {
+                    view.setUint8(44 + i, pcmData[i]);
+                }
+
+                return new Blob([view], { type: 'audio/wav' });
+            };
+
             const playAudioQueue = async () => {
                 if (isPlaying.current || audioQueue.current.length === 0) return;
                 isPlaying.current = true;
                 const chunk = audioQueue.current.shift();
+                if (!chunk) {
+                    console.error('Audio chunk is undefined');
+                    isPlaying.current = false;
+                    playAudioQueue();
+                    return;
+                }
                 console.log('Processing audio chunk, size:', chunk.byteLength);
 
                 try {
@@ -130,10 +169,7 @@
                 } catch (err) {
                     console.error('Audio decode error:', err.message);
                     isPlaying.current = false;
-                    const blob = new Blob([chunk], { type: 'audio/wav' });
-                    const url = URL.createObjectURL(blob);
-                    setFallbackAudioUrl(url);
-                    console.log('Fallback audio URL:', url);
+                    setError('Failed to decode audio. Check fallback player.');
                     playAudioQueue();
                 }
             };
@@ -238,8 +274,19 @@
                                 }
                             } else if (data.type === 'audio' && data.audio_event?.audio_base_64) {
                                 console.log('Received audio event, base64 length:', data.audio_event.audio_base_64.length);
+                                if (!data.audio_event.audio_base_64) {
+                                    console.error('Empty audio_base_64 data');
+                                    setError('Received empty audio data from server');
+                                    return;
+                                }
                                 try {
                                     const audioBytes = Uint8Array.from(atob(data.audio_event.audio_base_64), c => c.charCodeAt(0));
+                                    console.log('Audio bytes length:', audioBytes.length, 'First 10 bytes:', audioBytes.slice(0, 10));
+                                    if (audioBytes.length < 2) {
+                                        console.error('Audio data too short to process');
+                                        setError('Received invalid audio data (too short)');
+                                        return;
+                                    }
                                     const audioBuffer = audioContext.current.createBuffer(1, audioBytes.length / 2, 16000);
                                     const floatArray = new Float32Array(audioBytes.length / 2);
                                     for (let i = 0; i < audioBytes.length / 2; i++) {
@@ -247,15 +294,29 @@
                                         floatArray[i] = sample;
                                     }
                                     audioBuffer.getChannelData(0).set(floatArray);
-                                    audioQueue.current.push(audioBuffer.buffer);
-                                    console.log('Audio buffer queued, size:', audioBuffer.buffer.byteLength);
+                                    const buffer = audioBuffer.buffer;
+                                    if (!buffer || buffer.byteLength === 0) {
+                                        console.error('Invalid audio buffer created');
+                                        setError('Failed to create audio buffer');
+                                        return;
+                                    }
+                                    audioQueue.current.push(buffer);
+                                    console.log('Audio buffer queued, size:', buffer.byteLength);
                                     playAudioQueue();
+
+                                    // Create fallback WAV
+                                    const wavBlob = createWavBlob(audioBytes);
+                                    const url = URL.createObjectURL(wavBlob);
+                                    setFallbackAudioUrl(url);
+                                    console.log('Fallback audio URL created:', url);
                                 } catch (err) {
                                     console.error('Audio processing error:', err.message);
-                                    setError('Failed to process audio response');
-                                    const blob = new Blob([atob(data.audio_event.audio_base_64)], { type: 'audio/wav' });
-                                    setFallbackAudioUrl(URL.createObjectURL(blob));
-                                    console.log('Fallback audio URL created for manual playback');
+                                    setError('Failed to process audio response. Check fallback player.');
+                                    const audioBytes = Uint8Array.from(atob(data.audio_event.audio_base_64), c => c.charCodeAt(0));
+                                    const wavBlob = createWavBlob(audioBytes);
+                                    const url = URL.createObjectURL(wavBlob);
+                                    setFallbackAudioUrl(url);
+                                    console.log('Fallback audio URL created for manual playback:', url);
                                 }
                             } else if (data.type === 'error') {
                                 console.error('Server error:', data.error);
