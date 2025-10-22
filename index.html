@@ -31,6 +31,7 @@
             const [callTranscript, setCallTranscript] = useState([]);
             const [error, setError] = useState(null);
             const [audioAllowed, setAudioAllowed] = useState(false);
+            const [lastAudioUrl, setLastAudioUrl] = useState(null);
             const recognitionRef = useRef(null);
             const audioRef = useRef(null);
 
@@ -72,7 +73,6 @@
             // Initialize audio context
             useEffect(() => {
                 audioRef.current = new Audio();
-                // Attempt to unlock audio context with a user gesture
                 const unlockAudio = () => {
                     const audio = new Audio();
                     audio.play().then(() => {
@@ -88,12 +88,26 @@
                 return () => document.removeEventListener('click', unlockAudio);
             }, []);
 
+            const playAudio = () => {
+                if (lastAudioUrl && audioAllowed && !muted) {
+                    console.log('Manually playing audio:', lastAudioUrl);
+                    audioRef.current.src = lastAudioUrl;
+                    audioRef.current.play().catch(e => {
+                        console.error('Manual audio play error:', e);
+                        setError('Failed to play audio. Please allow audio in browser settings.');
+                    });
+                } else if (!audioAllowed) {
+                    setError('Audio playback is blocked. Click anywhere to enable audio.');
+                } else if (!lastAudioUrl) {
+                    setError('No audio available to play.');
+                }
+            };
+
             const handleUserSpeech = async (transcript) => {
                 if (!transcript.trim()) return;
 
                 console.log('User speech transcribed:', transcript);
 
-                // Add user message
                 const userMessage = {
                     id: Date.now(),
                     sender: 'user',
@@ -149,15 +163,16 @@
                             return [...prev, amaiaMessage];
                         });
 
-                        if (!muted && data.audioUrl && audioAllowed) {
-                            console.log('Attempting to play audio:', data.audioUrl);
-                            audioRef.current.src = data.audioUrl;
-                            audioRef.current.play().catch(e => {
-                                console.error('Audio play error:', e);
-                                setError('Failed to play audio. Please allow audio in browser settings.');
-                            });
-                        } else if (!audioAllowed) {
-                            setError('Audio playback is blocked. Click anywhere to enable audio.');
+                        if (data.audioUrl) {
+                            setLastAudioUrl(data.audioUrl);
+                            if (!muted && audioAllowed) {
+                                console.log('Attempting to play audio:', data.audioUrl);
+                                audioRef.current.src = data.audioUrl;
+                                audioRef.current.play().catch(e => {
+                                    console.error('Auto audio play error:', e);
+                                    setError('Auto-play failed. Click "Play Audio" to hear Amaia.');
+                                });
+                            }
                         }
                     } else {
                         console.warn('No reply in response');
@@ -166,184 +181,3 @@
                 } catch (error) {
                     console.error('Chat error:', error);
                     setError(error.message);
-                    const errorMessage = {
-                        id: Date.now() + 1,
-                        sender: 'amaia',
-                        text: 'Sorry, I had trouble hearing that. Try again?',
-                        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                    };
-                    setCallTranscript(prev => {
-                        console.log('Adding error transcript:', errorMessage);
-                        return [...prev, errorMessage];
-                    });
-                } finally {
-                    setIsThinking(false);
-                }
-            };
-
-            const startListening = () => {
-                if (recognitionRef.current && !isRecording) {
-                    console.log('Starting speech recognition');
-                    recognitionRef.current.start();
-                }
-            };
-
-            const stopListening = () => {
-                if (recognitionRef.current && isRecording) {
-                    console.log('Stopping speech recognition');
-                    recognitionRef.current.stop();
-                }
-            };
-
-            const startCall = () => {
-                setIsOnCall(true);
-                setCurrentPage('call');
-                const welcomeMessage = {
-                    id: 0,
-                    sender: 'amaia',
-                    text: "Hey, I'm so glad you called. Talk to me.",
-                    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                };
-                setCallTranscript([welcomeMessage]);
-                console.log('Call started, transcript initialized:', welcomeMessage);
-            };
-
-            const endCall = () => {
-                setIsOnCall(false);
-                setCurrentPage('intro');
-                setCallTranscript([]);
-                stopListening();
-                setError(null);
-                console.log('Call ended');
-            };
-
-            // INTRO PAGE
-            if (currentPage === 'intro') {
-                return (
-                    <div style={{ minHeight: '100vh', background: '#000', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden' }}>
-                        <div style={{ position: 'absolute', inset: 0, opacity: 0.2 }}>
-                            <div style={{ position: 'absolute', top: '80px', left: '40px', width: '384px', height: '384px', background: '#ec4899', borderRadius: '9999px', filter: 'blur(80px)' }} className="animate-pulse" />
-                            <div style={{ position: 'absolute', bottom: '80px', right: '40px', width: '320px', height: '320px', background: '#a855f7', borderRadius: '9999px', filter: 'blur(80px)', animationDelay: '1s' }} className="animate-pulse" />
-                        </div>
-
-                        <div style={{ position: 'relative', zIndex: 10, maxWidth: '448px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '32px', textAlign: 'center' }}>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                                <div style={{ width: '96px', height: '96px', margin: '0 auto', borderRadius: '9999px', background: 'linear-gradient(135deg, #ec4899, #a855f7)', boxShadow: '0 0 50px rgba(236, 72, 153, 0.5)' }} className="animate-pulse" />
-                                <div>
-                                    <h1 style={{ fontSize: '48px', fontWeight: 300, letterSpacing: '0.1em', marginBottom: '8px' }}>Amaia</h1>
-                                    <p style={{ color: '#9ca3af', fontSize: '14px' }}>is calling...</p>
-                                </div>
-                            </div>
-
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                                <div style={{ width: '8px', height: '8px', background: '#4ade80', borderRadius: '9999px' }} className="animate-pulse" />
-                                <p style={{ fontSize: '12px', color: '#9ca3af' }}>live voice chat</p>
-                            </div>
-
-                            <div style={{ display: 'flex', gap: '16px', justifyContent: 'center' }}>
-                                <button onClick={startCall} style={{ padding: '16px 48px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '9999px', fontWeight: '600', cursor: 'pointer', fontSize: '16px', boxShadow: '0 0 20px rgba(22, 163, 74, 0.5)' }}>
-                                    📞 Answer
-                                </button>
-                            </div>
-
-                            <p style={{ fontSize: '12px', color: '#4b5563', marginTop: '32px' }}>
-                                Welcome to Amaia's world. Real voice conversation.
-                            </p>
-                            {error && <p style={{ color: '#dc2626', fontSize: '14px', fontWeight: 500 }}>{error}</p>}
-                        </div>
-                    </div>
-                );
-            }
-
-            // CALL PAGE
-            if (currentPage === 'call') {
-                return (
-                    <div style={{ minHeight: '100vh', background: 'linear-gradient(to bottom, #030712, #000)', color: '#fff', display: 'flex', flexDirection: 'column' }}>
-                        <div style={{ position: 'sticky', top: 0, zIndex: 40, background: 'rgba(0, 0, 0, 0.8)', backdropFilter: 'blur(12px)', borderBottom: '1px solid #1f2937' }}>
-                            <div style={{ maxWidth: '1024px', margin: '0 auto', padding: '0 16px', height: '64px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                <div style={{ textAlign: 'center', flex: 1 }}>
-                                    <h2 style={{ fontWeight: 600 }}>Amaia</h2>
-                                    <p style={{ fontSize: '12px', color: '#4ade80' }}>on call</p>
-                                </div>
-                                <button onClick={() => setMuted(!muted)} style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', marginRight: '16px', fontSize: '20px' }}>
-                                    {muted ? '🔇' : '🔊'}
-                                </button>
-                                <button onClick={endCall} style={{ background: '#dc2626', border: 'none', borderRadius: '9999px', padding: '12px', color: '#fff', cursor: 'pointer', fontSize: '20px' }}>
-                                    📞
-                                </button>
-                            </div>
-                        </div>
-
-                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 16px', gap: '48px' }}>
-                            <div style={{ position: 'relative' }}>
-                                <div style={{ width: '128px', height: '128px', borderRadius: '9999px', background: 'linear-gradient(135deg, #ec4899, #a855f7)', boxShadow: '0 0 50px rgba(236, 72, 153, 0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px' }} className={isRecording ? 'animate-pulse' : isThinking ? 'animate-bounce' : ''}>
-                                    🎤
-                                </div>
-                                {isThinking && (
-                                    <div style={{ position: 'absolute', inset: 0, borderRadius: '9999px', border: '4px solid #ec4899' }} className="animate-pulse" />
-                                )}
-                            </div>
-
-                            <div style={{ textAlign: 'center' }}>
-                                {isRecording && <p style={{ color: '#f472b6', fontSize: '14px', fontWeight: 500 }} className="animate-pulse">Listening...</p>}
-                                {isThinking && <p style={{ color: '#c084fc', fontSize: '14px', fontWeight: 500 }} className="animate-pulse">Amaia is thinking...</p>}
-                                {!isRecording && !isThinking && <p style={{ color: '#9ca3af', fontSize: '14px' }}>Ready to listen</p>}
-                                {error && <p style={{ color: '#dc2626', fontSize: '14px', fontWeight: 500 }}>{error}</p>}
-                            </div>
-
-                            {callTranscript.length > 1 && (
-                                <div style={{ maxWidth: '448px', display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '128px', overflowY: 'auto' }}>
-                                    {callTranscript.slice(-2).map(msg => (
-                                        <div key={msg.id} style={{ fontSize: '14px', color: msg.sender === 'user' ? '#fda4af' : '#d1d5db' }}>
-                                            <p style={{ fontSize: '12px', color: '#4b5563', marginBottom: '4px' }}>{msg.sender === 'user' ? 'You' : 'Amaia'}</p>
-                                            <p style={{ fontStyle: 'italic' }}>{msg.text}</p>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-
-                            <button
-                                onClick={isRecording ? stopListening : startListening}
-                                disabled={isThinking}
-                                style={{
-                                    position: 'relative',
-                                    width: '80px',
-                                    height: '80px',
-                                    borderRadius: '9999px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    transform: isRecording ? 'scale(1.1)' : 'scale(1)',
-                                    background: isRecording ? '#dc2626' : '#ec4899',
-                                    border: 'none',
-                                    color: '#fff',
-                                    fontSize: '28px',
-                                    cursor: isThinking ? 'not-allowed' : 'pointer',
-                                    opacity: isThinking ? 0.5 : 1,
-                                    boxShadow: isRecording ? '0 0 20px rgba(220, 38, 38, 0.5)' : '0 0 20px rgba(236, 72, 153, 0.5)'
-                                }}
-                            >
-                                {isRecording ? '🎙️' : '🎤'}
-                            </button>
-                        </div>
-
-                        <div style={{ background: 'rgba(0, 0, 0, 0.5)', borderTop: '1px solid #1f2937', padding: '24px 16px', maxHeight: '192px', overflowY: 'auto' }}>
-                            <p style={{ fontSize: '12px', color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '16px' }}>Call History</p>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                {callTranscript.map(msg => (
-                                    <div key={msg.id} style={{ fontSize: '12px', color: msg.sender === 'user' ? '#fda4af' : '#9ca3af' }}>
-                                        <p style={{ fontWeight: 600, marginBottom: '4px' }}>{msg.sender === 'user' ? 'You' : 'Amaia'}</p>
-                                        <p style={{ lineHeight: 1.5 }}>{msg.text}</p>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-                );
-            }
-        }
-
-        ReactDOM.render(<AmaiaPlatform />, document.getElementById('root'));
-    </script>
-</body>
-</html>
