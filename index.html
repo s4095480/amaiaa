@@ -7,6 +7,7 @@
     <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎤</text></svg>">
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #000; color: #fff; }
@@ -18,6 +19,7 @@
 </head>
 <body>
     <div id="root"></div>
+    <audio id="audio-player" style="display: none;"></audio>
 
     <script type="text/babel">
         const { useState, useRef, useEffect } = React;
@@ -33,7 +35,7 @@
             const [audioAllowed, setAudioAllowed] = useState(false);
             const [lastAudioUrl, setLastAudioUrl] = useState(null);
             const recognitionRef = useRef(null);
-            const audioRef = useRef(null);
+            const audioRef = useRef(document.getElementById('audio-player'));
 
             // Initialize speech recognition
             useEffect(() => {
@@ -72,15 +74,14 @@
 
             // Initialize audio context
             useEffect(() => {
-                audioRef.current = new Audio();
                 const unlockAudio = () => {
-                    const audio = new Audio();
-                    audio.play().then(() => {
-                        console.log('Audio context unlocked');
+                    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                    ctx.resume().then(() => {
+                        console.log('Audio context resumed');
                         setAudioAllowed(true);
                     }).catch(e => {
-                        console.error('Audio unlock error:', e);
-                        setError('Please allow audio playback in your browser settings');
+                        console.error('Audio context resume error:', e);
+                        setError('Please allow audio playback by clicking the page.');
                     });
                     document.removeEventListener('click', unlockAudio);
                 };
@@ -92,12 +93,14 @@
                 if (lastAudioUrl && audioAllowed && !muted) {
                     console.log('Manually playing audio:', lastAudioUrl);
                     audioRef.current.src = lastAudioUrl;
-                    audioRef.current.play().catch(e => {
+                    audioRef.current.play().then(() => {
+                        console.log('Audio playback started');
+                    }).catch(e => {
                         console.error('Manual audio play error:', e);
-                        setError('Failed to play audio. Please allow audio in browser settings.');
+                        setError('Failed to play audio. Ensure audio is allowed in browser settings.');
                     });
                 } else if (!audioAllowed) {
-                    setError('Audio playback is blocked. Click anywhere to enable audio.');
+                    setError('Audio playback blocked. Click anywhere to enable audio.');
                 } else if (!lastAudioUrl) {
                     setError('No audio available to play.');
                 }
@@ -168,7 +171,9 @@
                             if (!muted && audioAllowed) {
                                 console.log('Attempting to play audio:', data.audioUrl);
                                 audioRef.current.src = data.audioUrl;
-                                audioRef.current.play().catch(e => {
+                                audioRef.current.play().then(() => {
+                                    console.log('Auto-play started');
+                                }).catch(e => {
                                     console.error('Auto audio play error:', e);
                                     setError('Auto-play failed. Click "Play Audio" to hear Amaia.');
                                 });
