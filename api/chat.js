@@ -20,10 +20,11 @@ module.exports = async (req, res) => {
   try {
     const { message } = req.body;
     const API_KEY = process.env.ELEVENLABS_API_KEY;
-    const VOICE_ID = '21m00Tcm4TlvDq8ikWAM'; // Your voice ID
+    const VOICE_ID = 'MvVkLH9bosldCRpQiTw1'; // Updated voice ID
 
     console.log('Received message:', message);
     console.log('API Key exists:', !!API_KEY);
+    console.log('Using Voice ID:', VOICE_ID);
 
     if (!message || !API_KEY) {
       console.log('Missing message or API key');
@@ -48,7 +49,7 @@ module.exports = async (req, res) => {
 
     console.log('TTS response status:', ttsResponse.status);
     const ttsResponseText = await ttsResponse.text();
-    console.log('TTS response body:', ttsResponseText);
+    console.log('TTS response body:', ttsResponseText.slice(0, 100)); // Log first 100 chars
 
     let audioBase64 = null;
     let replyText = `I heard you say "${message}". Let's keep chatting!`;
