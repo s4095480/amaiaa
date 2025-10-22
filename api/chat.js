@@ -32,7 +32,7 @@ module.exports = async (req, res) => {
       return;
     }
 
-    // Generate TTS response with shorter text to fit quota (costs ~5 credits)
+    // Generate TTS response with concise text (~20 chars, ~10-20 credits)
     console.log('Fetching TTS from ElevenLabs...');
     const ttsResponse = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}`, {
       method: 'POST',
@@ -41,7 +41,7 @@ module.exports = async (req, res) => {
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
-        text: `You said "${message}". What's next?`, // Shortened to ~20 chars
+        text: `You said "${message}". Talk more?`, // Short but natural
         model_id: 'eleven_monolingual_v1',
         voice_settings: { stability: 0.5, similarity_boost: 0.75 }
       })
