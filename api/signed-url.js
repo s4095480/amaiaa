@@ -6,11 +6,13 @@ module.exports = async (req, res) => {
   res.setHeader('Content-Type', 'application/json');
 
   if (req.method === 'OPTIONS') {
+    console.log('Handling OPTIONS request');
     res.status(200).end();
     return;
   }
 
   if (req.method !== 'GET') {
+    console.log('Invalid method:', req.method);
     res.status(405).json({ error: 'Method not allowed' });
     return;
   }
@@ -20,9 +22,10 @@ module.exports = async (req, res) => {
     const AGENT_ID = process.env.AGENT_ID;
 
     console.log('API Key exists:', !!API_KEY);
-    console.log('Agent ID:', AGENT_ID);
+    console.log('Agent ID:', AGENT_ID || 'undefined');
 
     if (!API_KEY || !AGENT_ID) {
+      console.log('Missing API key or agent ID');
       res.status(400).json({ error: 'Missing API key or agent ID' });
       return;
     }
@@ -36,13 +39,22 @@ module.exports = async (req, res) => {
     });
 
     console.log('Signed URL response status:', response.status);
+    const responseText = await response.text();
+    console.log('Signed URL response body:', responseText);
+
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Signed URL error details:', errorText);
-      throw new Error(`Failed to get signed URL: ${response.status} - ${errorText}`);
+      console.error('Signed URL error details:', responseText);
+      throw new Error(`Failed to get signed URL: ${response.status} - ${responseText}`);
     }
 
-    const data = await response.json();
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (e) {
+      console.error('JSON parse error:', e.message);
+      throw new Error('Invalid response format from ElevenLabs');
+    }
+
     console.log('Signed URL fetched:', data.signed_url.slice(0, 50) + '...');
 
     res.status(200).json({ signedUrl: data.signed_url });
