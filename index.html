@@ -36,7 +36,7 @@
             const audioContext = useRef(new (window.AudioContext || window.webkitAudioContext)());
             const audioQueue = useRef([]);
             const isPlaying = useRef(false);
-            const recognitionRef = useRef(null); // For local transcription UI
+            const recognitionRef = useRef(null);
 
             // Unlock audio context
             useEffect(() => {
@@ -44,7 +44,10 @@
                     audioContext.current.resume().then(() => {
                         console.log('Audio context unlocked');
                         setAudioAllowed(true);
-                    }).catch(e => console.error('Audio unlock error:', e));
+                    }).catch(e => {
+                        console.error('Audio unlock error:', e);
+                        setError('Audio permission blocked. Click to enable.');
+                    });
                 };
                 document.addEventListener('click', unlockAudio);
                 document.addEventListener('touchstart', unlockAudio);
@@ -54,12 +57,12 @@
                 };
             }, []);
 
-            // Local speech recognition for UI transcript (optional, for user messages)
+            // Local speech recognition for UI transcript
             useEffect(() => {
                 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
                 if (SpeechRecognition) {
                     recognitionRef.current = new SpeechRecognition();
-                    recognitionRef.current.continuous = true; // Continuous for streaming
+                    recognitionRef.current.continuous = true;
                     recognitionRef.current.interimResults = true;
                     recognitionRef.current.lang = 'en-US';
 
@@ -68,21 +71,23 @@
                         for (let i = event.resultIndex; i < event.results.length; i++) {
                             transcript += event.results[i][0].transcript + ' ';
                         }
-                        if (transcript.trim()) {
-                            // Update UI with interim transcript (optional)
-                            console.log('Interim transcript:', transcript);
-                        }
+                        console.log('Interim transcript:', transcript);
                         if (event.results[event.results.length - 1].isFinal) {
                             const finalTranscript = event.results[event.results.length - 1][0].transcript;
                             addToTranscript('You', finalTranscript);
                         }
                     };
-                    recognitionRef.current.onerror = (event) => console.error('Speech error:', event.error);
+                    recognitionRef.current.onerror = (event) => {
+                        console.error('Speech error:', event.error);
+                        setError('Microphone error: ' + event.error);
+                    };
+                } else {
+                    setError('Speech recognition not supported.');
                 }
             }, []);
 
             const addToTranscript = (speaker, text) => {
-                setCallTranscript(prev => [...prev, `${speaker}: ${text}`]);
+                setCallTranscript(prev => [...prev, { speaker, text, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }]);
             };
 
             const playAudioQueue = async () => {
@@ -112,7 +117,7 @@
                     const response = await fetch('/api/signed-url');
                     if (!response.ok) throw new Error('Failed to get signed URL');
                     const data = await response.json();
-                    console.log('Signed URL received');
+                    console.log('Signed URL received:', data.signedUrl.slice(0, 50) + '...');
                     return data.signedUrl;
                 } catch (error) {
                     console.error('Signed URL error:', error);
@@ -127,7 +132,8 @@
                 setStatus('Connecting to Amaia...');
                 setCallTranscript([{
                     speaker: 'Amaia',
-                    text: "Hey, I'm so glad you called. Talk to me."
+                    text: "Hey, I'm so glad you called. Talk to me.",
+                    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                 }]);
 
                 const signedUrl = await getSignedUrl();
@@ -140,9 +146,7 @@
                     console.log('WebSocket connected');
                     setIsConnected(true);
                     setStatus('Connected! Speak to Amaia.');
-                    // Start mic streaming
                     startMicrophone();
-                    // Optional: Send initiation if needed
                     websocketRef.current.send(JSON.stringify({ type: 'conversation_initiation_client_data' }));
                 };
 
@@ -187,7 +191,7 @@
                             websocketRef.current.send(event.data);
                         }
                     };
-                    mediaRecorderRef.current.start(250); // Send chunks every 250ms
+                    mediaRecorderRef.current.start(250);
                     console.log('Microphone streaming started');
                     setStatus('Listening...');
                     if (recognitionRef.current) recognitionRef.current.start();
@@ -284,8 +288,9 @@
 
                             <div style={{ maxWidth: '448px', display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '200px', overflowY: 'auto' }}>
                                 {callTranscript.map((msg, i) => (
-                                    <div key={i} style={{ fontSize: '14px', color: msg.startsWith('You') ? '#fda4af' : '#d1d5db' }}>
-                                        <p>{msg}</p>
+                                    <div key={i} style={{ fontSize: '14px', color: msg.speaker === 'You' ? '#fda4af' : '#d1d5db' }}>
+                                        <p style={{ fontSize: '12px', color: '#4b5563', marginBottom: '4px' }}>{msg.speaker} ({msg.time})</p>
+                                        <p>{msg.text}</p>
                                     </div>
                                 ))}
                             </div>
@@ -295,8 +300,9 @@
                             <p style={{ fontSize: '12px', color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '16px' }}>Call History</p>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                                 {callTranscript.map((msg, i) => (
-                                    <div key={i} style={{ fontSize: '12px', color: msg.startsWith('You') ? '#fda4af' : '#9ca3af' }}>
-                                        <p>{msg}</p>
+                                    <div key={i} style={{ fontSize: '12px', color: msg.speaker === 'You' ? '#fda4af' : '#9ca3af' }}>
+                                        <p style={{ fontWeight: 600, marginBottom: '4px' }}>{msg.speaker} ({msg.time})</p>
+                                        <p>{msg.text}</p>
                                     </div>
                                 ))}
                             </div>
