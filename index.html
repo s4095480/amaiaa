@@ -13,13 +13,10 @@
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #000; color: #fff; }
         .animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-        .animate-bounce { animation: bounce 1s infinite; }
-        @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
     </style>
 </head>
 <body>
     <div id="root"></div>
-    <audio id="audio-player" style="display: none;"></audio>
 
     <script type="text/babel">
         const { useState, useRef, useEffect } = React;
@@ -27,215 +24,436 @@
         function AmaiaPlatform() {
             const [currentPage, setCurrentPage] = useState('intro');
             const [isOnCall, setIsOnCall] = useState(false);
-            const [isRecording, setIsRecording] = useState(false);
-            const [isThinking, setIsThinking] = useState(false);
-            const [muted, setMuted] = useState(false);
+            const [isConnected, setIsConnected] = useState(false);
+            const [status, setStatus] = useState('Amaia is online');
             const [callTranscript, setCallTranscript] = useState([]);
             const [error, setError] = useState(null);
             const [audioAllowed, setAudioAllowed] = useState(false);
-            const [lastAudioUrl, setLastAudioUrl] = useState(null);
+            const [fallbackAudioUrl, setFallbackAudioUrl] = useState(null);
+            const websocketRef = useRef(null);
+            const audioContext = useRef(new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 }));
+            const scriptProcessorRef = useRef(null);
+            const mediaStreamRef = useRef(null);
+            const audioQueue = useRef([]);
+            const isPlaying = useRef(false);
             const recognitionRef = useRef(null);
-            const audioRef = useRef(document.getElementById('audio-player'));
+            const pingIntervalRef = useRef(null);
+            const reconnectAttempts = useRef(0);
+            const maxReconnectAttempts = 3;
+            const responseBuffer = useRef('');
+            const lastResponse = useRef('');
 
-            // Initialize speech recognition
+            // Unlock audio context and test audio playback
+            useEffect(() => {
+                const unlockAudio = () => {
+                    audioContext.current.resume().then(() => {
+                        console.log('Audio context unlocked');
+                        setAudioAllowed(true);
+                        const testSound = audioContext.current.createOscillator();
+                        testSound.type = 'sine';
+                        testSound.frequency.setValueAtTime(440, audioContext.current.currentTime);
+                        testSound.connect(audioContext.current.destination);
+                        testSound.start();
+                        testSound.stop(audioContext.current.currentTime + 0.5);
+                        console.log('Test tone played to verify audio context');
+                    }).catch(e => {
+                        console.error('Audio unlock error:', e);
+                        setError('Audio permission blocked. Click to enable.');
+                    });
+                };
+                document.addEventListener('click', unlockAudio);
+                document.addEventListener('touchstart', unlockAudio);
+                return () => {
+                    document.removeEventListener('click', unlockAudio);
+                    document.removeEventListener('touchstart', unlockAudio);
+                };
+            }, []);
+
+            // Local speech recognition for UI transcript
             useEffect(() => {
                 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
                 if (SpeechRecognition) {
                     recognitionRef.current = new SpeechRecognition();
-                    recognitionRef.current.continuous = false;
-                    recognitionRef.current.interimResults = false;
+                    recognitionRef.current.continuous = true;
+                    recognitionRef.current.interimResults = true;
                     recognitionRef.current.lang = 'en-US';
 
-                    recognitionRef.current.onstart = () => {
-                        console.log('Speech recognition started');
-                        setIsRecording(true);
-                    };
-                    recognitionRef.current.onend = () => {
-                        console.log('Speech recognition ended');
-                        setIsRecording(false);
-                    };
                     recognitionRef.current.onresult = (event) => {
+                        let transcript = '';
                         for (let i = event.resultIndex; i < event.results.length; i++) {
-                            if (event.results[i].isFinal) {
-                                handleUserSpeech(event.results[i][0].transcript);
-                            }
+                            transcript += event.results[i][0].transcript + ' ';
+                        }
+                        console.log('Interim transcript:', transcript);
+                        if (event.results[event.results.length - 1].isFinal) {
+                            const finalTranscript = event.results[event.results.length - 1][0].transcript;
+                            addToTranscript('You', finalTranscript);
                         }
                     };
                     recognitionRef.current.onerror = (event) => {
                         console.error('Speech error:', event.error);
-                        setIsRecording(false);
                         setError('Microphone error: ' + event.error);
                     };
+                    recognitionRef.current.onend = () => {
+                        console.log('Speech recognition ended');
+                        if (isOnCall && isConnected) recognitionRef.current.start();
+                    };
                 } else {
-                    console.error('Speech Recognition not supported');
-                    setError('Speech Recognition not supported in this browser');
+                    setError('Speech recognition not supported.');
                 }
-            }, []);
+            }, [isOnCall, isConnected]);
 
-            // Initialize audio context
-            useEffect(() => {
-                const unlockAudio = () => {
-                    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-                    ctx.resume().then(() => {
-                        console.log('Audio context resumed');
-                        setAudioAllowed(true);
-                    }).catch(e => {
-                        console.error('Audio context resume error:', e);
-                        setError('Please allow audio playback by clicking the page.');
-                    });
-                    document.removeEventListener('click', unlockAudio);
-                };
-                document.addEventListener('click', unlockAudio);
-                return () => document.removeEventListener('click', unlockAudio);
-            }, []);
-
-            const playAudio = () => {
-                if (lastAudioUrl && audioAllowed && !muted) {
-                    console.log('Manually playing audio:', lastAudioUrl);
-                    audioRef.current.src = lastAudioUrl;
-                    audioRef.current.play().then(() => {
-                        console.log('Audio playback started');
-                    }).catch(e => {
-                        console.error('Manual audio play error:', e);
-                        setError('Failed to play audio. Ensure audio is allowed in browser settings.');
-                    });
-                } else if (!audioAllowed) {
-                    setError('Audio playback blocked. Click anywhere to enable audio.');
-                } else if (!lastAudioUrl) {
-                    setError('No audio available to play.');
+            const addToTranscript = (speaker, text) => {
+                if (text && text.trim()) {
+                    setCallTranscript(prev => [...prev, { speaker, text, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }]);
+                    if (speaker === 'Amaia') lastResponse.current = text;
                 }
             };
 
-            const handleUserSpeech = async (transcript) => {
-                if (!transcript.trim()) return;
+            const createWavBlob = (pcmData) => {
+                const sampleRate = 16000;
+                const numChannels = 1;
+                const bitsPerSample = 16;
+                const byteRate = sampleRate * numChannels * bitsPerSample / 8;
+                const blockAlign = numChannels * bitsPerSample / 8;
+                const dataSize = pcmData.length;
+                const buffer = new ArrayBuffer(44 + dataSize);
+                const view = new DataView(buffer);
 
-                console.log('User speech transcribed:', transcript);
+                // WAV Header
+                view.setUint32(0, 0x52494646, false); // "RIFF"
+                view.setUint32(4, 36 + dataSize, true); // Chunk size
+                view.setUint32(8, 0x57415645, false); // "WAVE"
+                view.setUint32(12, 0x666d7420, false); // "fmt "
+                view.setUint32(16, 16, true); // Subchunk1Size (16 for PCM)
+                view.setUint16(20, 1, true); // AudioFormat (1 for PCM)
+                view.setUint16(22, numChannels, true); // NumChannels
+                view.setUint32(24, sampleRate, true); // SampleRate
+                view.setUint32(28, byteRate, true); // ByteRate
+                view.setUint16(32, blockAlign, true); // BlockAlign
+                view.setUint16(34, bitsPerSample, true); // BitsPerSample
+                view.setUint32(36, 0x64617461, false); // "data"
+                view.setUint32(40, dataSize, true); // Subchunk2Size
 
-                const userMessage = {
-                    id: Date.now(),
-                    sender: 'user',
-                    text: transcript,
-                    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                };
-                setCallTranscript(prev => {
-                    console.log('Adding user transcript:', userMessage);
-                    return [...prev, userMessage];
-                });
+                // PCM Data
+                for (let i = 0; i < pcmData.length; i++) {
+                    view.setUint8(44 + i, pcmData[i]);
+                }
 
-                setIsThinking(true);
-                setError(null);
+                return new Blob([view], { type: 'audio/wav' });
+            };
+
+            const validatePcmData = (audioBytes) => {
+                if (audioBytes.length < 2) {
+                    console.error('PCM data too short:', audioBytes.length);
+                    return false;
+                }
+                let nonZeroCount = 0;
+                for (let i = 0; i < Math.min(audioBytes.length, 100); i++) {
+                    if (audioBytes[i] !== 0 && audioBytes[i] !== 255) {
+                        nonZeroCount++;
+                    }
+                }
+                const nonZeroRatio = nonZeroCount / Math.min(audioBytes.length, 100);
+                if (nonZeroRatio < 0.1) {
+                    console.error('PCM data appears invalid: too many zero or 255 bytes', nonZeroCount, 'non-zero in first 100 bytes');
+                    return false;
+                }
+                return true;
+            };
+
+            const playAudioQueue = async () => {
+                if (isPlaying.current || audioQueue.current.length === 0) return;
+                isPlaying.current = true;
+                const chunk = audioQueue.current.shift();
+                if (!chunk) {
+                    console.error('Audio chunk is undefined');
+                    isPlaying.current = false;
+                    playAudioQueue();
+                    return;
+                }
+                console.log('Processing audio chunk, size:', chunk.byteLength);
 
                 try {
-                    const response = await fetch('/api/chat', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ message: transcript })
-                    });
-
-                    console.log('Response status:', response.status);
-                    const responseText = await response.text();
-                    console.log('Raw response:', responseText);
-
-                    if (!response.ok) {
-                        throw new Error(`Backend error: ${response.status} - ${responseText}`);
-                    }
-
-                    let data;
-                    try {
-                        data = JSON.parse(responseText);
-                    } catch (e) {
-                        console.error('JSON parse error:', e);
-                        throw new Error('Invalid response format from server');
-                    }
-
-                    console.log('Backend response:', data);
-
-                    if (data.error) {
-                        throw new Error(data.error);
-                    }
-
-                    if (data.reply) {
-                        const amaiaMessage = {
-                            id: Date.now() + 1,
-                            sender: 'amaia',
-                            text: data.reply,
-                            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                        };
-                        setCallTranscript(prev => {
-                            console.log('Adding Amaia transcript:', amaiaMessage);
-                            return [...prev, amaiaMessage];
-                        });
-
-                        if (data.audioUrl) {
-                            setLastAudioUrl(data.audioUrl);
-                            if (!muted && audioAllowed) {
-                                console.log('Attempting to play audio:', data.audioUrl);
-                                audioRef.current.src = data.audioUrl;
-                                audioRef.current.play().then(() => {
-                                    console.log('Auto-play started');
-                                }).catch(e => {
-                                    console.error('Auto audio play error:', e);
-                                    setError('Auto-play failed. Click "Play Audio" to hear Amaia.');
-                                });
-                            }
-                        }
-                    } else {
-                        console.warn('No reply in response');
-                        setError('No response from Amaia');
-                    }
-                } catch (error) {
-                    console.error('Chat error:', error);
-                    setError(error.message);
-                    const errorMessage = {
-                        id: Date.now() + 1,
-                        sender: 'amaia',
-                        text: 'Sorry, I had trouble hearing that. Try again?',
-                        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                    const buffer = await audioContext.current.decodeAudioData(chunk);
+                    const source = audioContext.current.createBufferSource();
+                    source.buffer = buffer;
+                    source.connect(audioContext.current.destination);
+                    source.start();
+                    console.log('Audio playback started');
+                    source.onended = () => {
+                        console.log('Audio chunk ended');
+                        isPlaying.current = false;
+                        playAudioQueue();
                     };
-                    setCallTranscript(prev => {
-                        console.log('Adding error transcript:', errorMessage);
-                        return [...prev, errorMessage];
-                    });
-                } finally {
-                    setIsThinking(false);
+                } catch (err) {
+                    console.error('Audio decode error:', err.message);
+                    isPlaying.current = false;
+                    setError('Failed to decode audio. Check fallback player or download raw WAV.');
+                    playAudioQueue();
                 }
             };
 
-            const startListening = () => {
-                if (recognitionRef.current && !isRecording) {
-                    console.log('Starting speech recognition');
-                    recognitionRef.current.start();
+            const testAudioPlayback = () => {
+                console.log('Testing audio playback with sample PCM');
+                const sampleRate = 16000;
+                const duration = 1;
+                const audioBuffer = audioContext.current.createBuffer(1, sampleRate * duration, sampleRate);
+                const data = audioBuffer.getChannelData(0);
+                for (let i = 0; i < data.length; i++) {
+                    data[i] = Math.sin(2 * Math.PI * 440 * i / sampleRate) * 0.5;
+                }
+                const source = audioContext.current.createBufferSource();
+                source.buffer = audioBuffer;
+                source.connect(audioContext.current.destination);
+                source.start();
+                console.log('Sample PCM audio playback started');
+                source.onended = () => {
+                    console.log('Sample PCM audio playback ended');
+                };
+            };
+
+            const getSignedUrl = async () => {
+                try {
+                    console.log('Fetching signed URL...');
+                    const response = await fetch('/api/signed-url');
+                    if (!response.ok) throw new Error(`Failed to get signed URL: ${response.status}`);
+                    const data = await response.json();
+                    console.log('Signed URL received:', data.signedUrl.slice(0, 50) + '...');
+                    return data.signedUrl;
+                } catch (error) {
+                    console.error('Signed URL error:', error);
+                    setError('Failed to connect to Amaia. Check console.');
+                    return null;
                 }
             };
 
-            const stopListening = () => {
-                if (recognitionRef.current && isRecording) {
-                    console.log('Stopping speech recognition');
-                    recognitionRef.current.stop();
-                }
-            };
-
-            const startCall = () => {
+            const startCall = async () => {
                 setIsOnCall(true);
                 setCurrentPage('call');
-                const welcomeMessage = {
-                    id: 0,
-                    sender: 'amaia',
+                setStatus('Connecting to Amaia...');
+                setCallTranscript([{
+                    speaker: 'Amaia',
                     text: "Hey, I'm so glad you called. Talk to me.",
                     time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                };
-                setCallTranscript([welcomeMessage]);
-                console.log('Call started, transcript initialized:', welcomeMessage);
+                }]);
+                lastResponse.current = "Hey, I'm so glad you called. Talk to me.";
+                reconnectAttempts.current = 0;
+                connectWebSocket();
             };
 
+            const connectWebSocket = async () => {
+                if (reconnectAttempts.current >= maxReconnectAttempts) {
+                    setError('Max reconnect attempts reached. Please try again.');
+                    setStatus('Disconnected');
+                    return;
+                }
+
+                const signedUrl = await getSignedUrl();
+                if (!signedUrl) return;
+
+                console.log('Connecting to WebSocket:', signedUrl);
+                websocketRef.current = new WebSocket(signedUrl);
+
+                websocketRef.current.onopen = () => {
+                    console.log('WebSocket connected');
+                    setIsConnected(true);
+                    setStatus('Connected! Speak to Amaia.');
+                    reconnectAttempts.current = 0;
+                    websocketRef.current.send(JSON.stringify({ type: 'conversation_initiation_client_data' }));
+                    startMicrophone();
+                    pingIntervalRef.current = setInterval(() => {
+                        if (websocketRef.current && websocketRef.current.readyState === WebSocket.OPEN) {
+                            console.log('Sending ping');
+                            websocketRef.current.send(JSON.stringify({ type: 'ping' }));
+                        }
+                    }, 3000);
+                };
+
+                websocketRef.current.onmessage = (event) => {
+                    console.log('Received message, type:', typeof event.data);
+                    console.log('Raw message content:', event.data);
+                    if (typeof event.data === 'string') {
+                        try {
+                            const data = JSON.parse(event.data);
+                            console.log('Parsed message:', JSON.stringify(data, null, 2));
+                            if (data.type === 'agent_response' && data.agent_response_event?.agent_response) {
+                                if (data.agent_response_event.agent_response !== lastResponse.current) {
+                                    addToTranscript('Amaia', data.agent_response_event.agent_response);
+                                }
+                            } else if (data.type === 'agent_chat_response_part' && data.text_response_part) {
+                                if (data.text_response_part.type === 'start') {
+                                    responseBuffer.current = '';
+                                } else if (data.text_response_part.type === 'delta' && data.text_response_part.text) {
+                                    responseBuffer.current += data.text_response_part.text;
+                                } else if (data.text_response_part.type === 'stop' && responseBuffer.current) {
+                                    if (responseBuffer.current !== lastResponse.current) {
+                                        addToTranscript('Amaia', responseBuffer.current);
+                                    }
+                                    responseBuffer.current = '';
+                                }
+                            } else if (data.type === 'audio' && data.audio_event?.audio_base_64) {
+                                console.log('Received audio event, base64 length:', data.audio_event.audio_base_64.length);
+                                if (!data.audio_event.audio_base_64) {
+                                    console.error('Empty audio_base_64 data');
+                                    setError('Received empty audio data from server');
+                                    return;
+                                }
+                                try {
+                                    const audioBytes = Uint8Array.from(atob(data.audio_event.audio_base_64), c => c.charCodeAt(0));
+                                    console.log('Audio bytes length:', audioBytes.length, 'First 10 bytes:', audioBytes.slice(0, 10));
+                                    if (!validatePcmData(audioBytes)) {
+                                        console.error('Invalid PCM data detected');
+                                        setError('Invalid audio data received. Download raw WAV to inspect.');
+                                        const wavBlob = createWavBlob(audioBytes);
+                                        const url = URL.createObjectURL(wavBlob);
+                                        setFallbackAudioUrl(url);
+                                        console.log('Fallback audio URL created:', url);
+                                        return;
+                                    }
+                                    const audioBuffer = audioContext.current.createBuffer(1, audioBytes.length / 2, 16000);
+                                    const floatArray = new Float32Array(audioBytes.length / 2);
+                                    for (let i = 0; i < audioBytes.length / 2; i++) {
+                                        const sample = ((audioBytes[i * 2] | (audioBytes[i * 2 + 1] << 8)) - 32768) / 32768;
+                                        floatArray[i] = sample;
+                                    }
+                                    audioBuffer.getChannelData(0).set(floatArray);
+                                    const buffer = audioBuffer.buffer;
+                                    if (!buffer || buffer.byteLength === 0) {
+                                        console.error('Invalid audio buffer created');
+                                        setError('Failed to create audio buffer. Download raw WAV to inspect.');
+                                        const wavBlob = createWavBlob(audioBytes);
+                                        const url = URL.createObjectURL(wavBlob);
+                                        setFallbackAudioUrl(url);
+                                        console.log('Fallback audio URL created:', url);
+                                        return;
+                                    }
+                                    audioQueue.current.push(buffer);
+                                    console.log('Audio buffer queued, size:', buffer.byteLength);
+                                    playAudioQueue();
+
+                                    // Create fallback WAV
+                                    const wavBlob = createWavBlob(audioBytes);
+                                    const url = URL.createObjectURL(wavBlob);
+                                    setFallbackAudioUrl(url);
+                                    console.log('Fallback audio URL created:', url);
+                                } catch (err) {
+                                    console.error('Audio processing error:', err.message);
+                                    setError('Failed to process audio response. Download raw WAV to inspect.');
+                                    const audioBytes = Uint8Array.from(atob(data.audio_event.audio_base_64), c => c.charCodeAt(0));
+                                    const wavBlob = createWavBlob(audioBytes);
+                                    const url = URL.createObjectURL(wavBlob);
+                                    setFallbackAudioUrl(url);
+                                    console.log('Fallback audio URL created for manual playback:', url);
+                                }
+                            } else if (data.type === 'error') {
+                                console.error('Server error:', data.error);
+                                setError(`Server error: ${data.error.message || 'Unknown error'}`);
+                            } else {
+                                console.log('Unhandled message type:', data.type);
+                            }
+                        } catch (err) {
+                            console.error('JSON parse error:', err.message);
+                            setError('Failed to parse server response');
+                        }
+                    } else {
+                        console.error('Received unexpected binary data');
+                        setError('Received invalid data from server');
+                    }
+                };
+
+                websocketRef.current.onerror = (err) => {
+                    console.error('WebSocket error:', err);
+                    setError('Connection error. Attempting to reconnect...');
+                };
+
+                websocketRef.current.onclose = (event) => {
+                    console.log('WebSocket closed, code:', event.code, 'reason:', event.reason || 'No reason provided');
+                    setIsConnected(false);
+                    setStatus('Disconnected');
+                    stopMicrophone();
+                    if (pingIntervalRef.current) {
+                        clearInterval(pingIntervalRef.current);
+                        pingIntervalRef.current = null;
+                    }
+                    if (isOnCall && reconnectAttempts.current < maxReconnectAttempts) {
+                        reconnectAttempts.current += 1;
+                        console.log(`Reconnecting WebSocket, attempt ${reconnectAttempts.current}/${maxReconnectAttempts}`);
+                        setTimeout(connectWebSocket, 2000 * reconnectAttempts.current);
+                    }
+                };
+            };
+
+            const startMicrophone = async () => {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    mediaStreamRef.current = stream;
+                    const source = audioContext.current.createMediaStreamSource(stream);
+                    scriptProcessorRef.current = audioContext.current.createScriptProcessor(4096, 1, 1);
+                    source.connect(scriptProcessorRef.current);
+                    scriptProcessorRef.current.connect(audioContext.current.destination);
+                    scriptProcessorRef.current.onaudioprocess = (e) => {
+                        if (websocketRef.current && websocketRef.current.readyState === WebSocket.OPEN) {
+                            const input = e.inputBuffer.getChannelData(0);
+                            const buffer = new ArrayBuffer(input.length * 2);
+                            const view = new DataView(buffer);
+                            for (let i = 0; i < input.length; i++) {
+                                const s = Math.max(-1, Math.min(1, input[i]));
+                                view.setInt16(i * 2, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+                            }
+                            const base64 = arrayBufferToBase64(buffer);
+                            websocketRef.current.send(JSON.stringify({ user_audio_chunk: base64 }));
+                            console.log('Sent PCM audio chunk, size:', buffer.byteLength, 'bytes (base64 length:', base64.length, ')');
+                        } else {
+                            console.log('Skipped audio chunk, size:', e.inputBuffer.length * 2, 'WebSocket state:', websocketRef.current?.readyState);
+                        }
+                    };
+                    console.log('Microphone streaming started (PCM 16000Hz)');
+                    setStatus('Listening...');
+                    if (recognitionRef.current) recognitionRef.current.start();
+                } catch (err) {
+                    console.error('Mic error:', err);
+                    setError('Microphone permission denied.');
+                }
+            };
+
+            const stopMicrophone = () => {
+                if (mediaStreamRef.current) {
+                    mediaStreamRef.current.getTracks().forEach(track => track.stop());
+                    mediaStreamRef.current = null;
+                }
+                if (scriptProcessorRef.current) {
+                    scriptProcessorRef.current.disconnect();
+                    scriptProcessorRef.current = null;
+                }
+                if (recognitionRef.current) recognitionRef.current.stop();
+                console.log('Microphone stopped');
+            };
+
+            function arrayBufferToBase64(buffer) {
+                let binary = '';
+                const bytes = new Uint8Array(buffer);
+                const len = bytes.byteLength;
+                for (let i = 0; i < len; i++) {
+                    binary += String.fromCharCode(bytes[i]);
+                }
+                return window.btoa(binary);
+            }
+
             const endCall = () => {
+                if (websocketRef.current) websocketRef.current.close();
+                stopMicrophone();
                 setIsOnCall(false);
                 setCurrentPage('intro');
                 setCallTranscript([]);
-                setLastAudioUrl(null);
-                stopListening();
+                setStatus('Amaia is online');
                 setError(null);
-                console.log('Call ended');
+                setFallbackAudioUrl(null);
+                if (pingIntervalRef.current) {
+                    clearInterval(pingIntervalRef.current);
+                    pingIntervalRef.current = null;
+                }
+                responseBuffer.current = '';
+                lastResponse.current = '';
             };
 
             // INTRO PAGE
@@ -258,7 +476,7 @@
 
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
                                 <div style={{ width: '8px', height: '8px', background: '#4ade80', borderRadius: '9999px' }} className="animate-pulse" />
-                                <p style={{ fontSize: '12px', color: '#9ca3af' }}>live voice chat</p>
+                                <p style={{ fontSize: '12px', color: '#9ca3af' }}>live voice call</p>
                             </div>
 
                             <div style={{ display: 'flex', gap: '16px', justifyContent: 'center' }}>
@@ -268,7 +486,7 @@
                             </div>
 
                             <p style={{ fontSize: '12px', color: '#4b5563', marginTop: '32px' }}>
-                                Welcome to Amaia's world. Real voice conversation.
+                                Welcome to Amaia's world. Real voice conversation powered by ElevenLabs agent.
                             </p>
                             {error && <p style={{ color: '#dc2626', fontSize: '14px', fontWeight: 500 }}>{error}</p>}
                         </div>
@@ -284,11 +502,8 @@
                             <div style={{ maxWidth: '1024px', margin: '0 auto', padding: '0 16px', height: '64px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                 <div style={{ textAlign: 'center', flex: 1 }}>
                                     <h2 style={{ fontWeight: 600 }}>Amaia</h2>
-                                    <p style={{ fontSize: '12px', color: '#4ade80' }}>on call</p>
+                                    <p style={{ fontSize: '12px', color: '#4ade80' }}>{isConnected ? 'on call' : 'connecting...'}</p>
                                 </div>
-                                <button onClick={() => setMuted(!muted)} style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', marginRight: '16px', fontSize: '20px' }}>
-                                    {muted ? '🔇' : '🔊'}
-                                </button>
                                 <button onClick={endCall} style={{ background: '#dc2626', border: 'none', borderRadius: '9999px', padding: '12px', color: '#fff', cursor: 'pointer', fontSize: '20px' }}>
                                     📞
                                 </button>
@@ -297,83 +512,49 @@
 
                         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 16px', gap: '48px' }}>
                             <div style={{ position: 'relative' }}>
-                                <div style={{ width: '128px', height: '128px', borderRadius: '9999px', background: 'linear-gradient(135deg, #ec4899, #a855f7)', boxShadow: '0 0 50px rgba(236, 72, 153, 0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px' }} className={isRecording ? 'animate-pulse' : isThinking ? 'animate-bounce' : ''}>
+                                <div style={{ width: '128px', height: '128px', borderRadius: '9999px', background: 'linear-gradient(135deg, #ec4899, #a855f7)', boxShadow: '0 0 50px rgba(236, 72, 153, 0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px' }} className={isConnected ? 'animate-pulse' : ''}>
                                     🎤
                                 </div>
-                                {isThinking && (
-                                    <div style={{ position: 'absolute', inset: 0, borderRadius: '9999px', border: '4px solid #ec4899' }} className="animate-pulse" />
-                                )}
                             </div>
 
                             <div style={{ textAlign: 'center' }}>
-                                {isRecording && <p style={{ color: '#f472b6', fontSize: '14px', fontWeight: 500 }} className="animate-pulse">Listening...</p>}
-                                {isThinking && <p style={{ color: '#c084fc', fontSize: '14px', fontWeight: 500 }} className="animate-pulse">Amaia is thinking...</p>}
-                                {!isRecording && !isThinking && <p style={{ color: '#9ca3af', fontSize: '14px' }}>Ready to listen</p>}
+                                <p style={{ color: '#9ca3af', fontSize: '14px' }}>{status}</p>
                                 {error && <p style={{ color: '#dc2626', fontSize: '14px', fontWeight: 500 }}>{error}</p>}
                             </div>
 
-                            {callTranscript.length > 1 && (
-                                <div style={{ maxWidth: '448px', display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '128px', overflowY: 'auto' }}>
-                                    {callTranscript.slice(-2).map(msg => (
-                                        <div key={msg.id} style={{ fontSize: '14px', color: msg.sender === 'user' ? '#fda4af' : '#d1d5db' }}>
-                                            <p style={{ fontSize: '12px', color: '#4b5563', marginBottom: '4px' }}>{msg.sender === 'user' ? 'You' : 'Amaia'}</p>
-                                            <p style={{ fontStyle: 'italic' }}>{msg.text}</p>
-                                        </div>
-                                    ))}
+                            <button onClick={testAudioPlayback} style={{ padding: '12px 24px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '9999px', fontWeight: '600', cursor: 'pointer', fontSize: '14px' }}>
+                                Test Audio Playback
+                            </button>
+
+                            {fallbackAudioUrl && (
+                                <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                                    <p style={{ color: '#f59e0b', fontSize: '14px' }}>Audio decode failed. Use fallback player or download raw WAV:</p>
+                                    <audio controls src={fallbackAudioUrl}>
+                                        Your browser does not support the audio element.
+                                    </audio>
+                                    <a href={fallbackAudioUrl} download="amaia_audio.wav" style={{ padding: '8px 16px', background: '#eab308', color: '#000', border: 'none', borderRadius: '9999px', fontWeight: '600', cursor: 'pointer', fontSize: '14px', textDecoration: 'none' }}>
+                                        Download Raw WAV
+                                    </a>
                                 </div>
                             )}
 
-                            <div style={{ display: 'flex', gap: '16px' }}>
-                                <button
-                                    onClick={isRecording ? stopListening : startListening}
-                                    disabled={isThinking}
-                                    style={{
-                                        position: 'relative',
-                                        width: '80px',
-                                        height: '80px',
-                                        borderRadius: '9999px',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        transform: isRecording ? 'scale(1.1)' : 'scale(1)',
-                                        background: isRecording ? '#dc2626' : '#ec4899',
-                                        border: 'none',
-                                        color: '#fff',
-                                        fontSize: '28px',
-                                        cursor: isThinking ? 'not-allowed' : 'pointer',
-                                        opacity: isThinking ? 0.5 : 1,
-                                        boxShadow: isRecording ? '0 0 20px rgba(220, 38, 38, 0.5)' : '0 0 20px rgba(236, 72, 153, 0.5)'
-                                    }}
-                                >
-                                    {isRecording ? '🎙️' : '🎤'}
-                                </button>
-                                <button
-                                    onClick={playAudio}
-                                    disabled={!lastAudioUrl || isThinking}
-                                    style={{
-                                        padding: '16px 32px',
-                                        background: lastAudioUrl && !isThinking ? '#16a34a' : '#4b5563',
-                                        color: '#fff',
-                                        border: 'none',
-                                        borderRadius: '9999px',
-                                        fontWeight: '600',
-                                        cursor: lastAudioUrl && !isThinking ? 'pointer' : 'not-allowed',
-                                        fontSize: '14px',
-                                        boxShadow: lastAudioUrl && !isThinking ? '0 0 20px rgba(22, 163, 74, 0.5)' : 'none'
-                                    }}
-                                >
-                                    ▶️ Play Audio
-                                </button>
+                            <div style={{ maxWidth: '448px', display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '200px', overflowY: 'auto' }}>
+                                {callTranscript.map((msg, i) => (
+                                    <div key={i} style={{ fontSize: '14px', color: msg.speaker === 'You' ? '#fda4af' : '#d1d5db' }}>
+                                        <p style={{ fontSize: '12px', color: '#4b5563', marginBottom: '4px' }}>{msg.speaker} ({msg.time})</p>
+                                        <p>{msg.text}</p>
+                                    </div>
+                                ))}
                             </div>
                         </div>
 
                         <div style={{ background: 'rgba(0, 0, 0, 0.5)', borderTop: '1px solid #1f2937', padding: '24px 16px', maxHeight: '192px', overflowY: 'auto' }}>
                             <p style={{ fontSize: '12px', color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '16px' }}>Call History</p>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                {callTranscript.map(msg => (
-                                    <div key={msg.id} style={{ fontSize: '12px', color: msg.sender === 'user' ? '#fda4af' : '#9ca3af' }}>
-                                        <p style={{ fontWeight: 600, marginBottom: '4px' }}>{msg.sender === 'user' ? 'You' : 'Amaia'}</p>
-                                        <p style={{ lineHeight: 1.5 }}>{msg.text}</p>
+                                {callTranscript.map((msg, i) => (
+                                    <div key={i} style={{ fontSize: '12px', color: msg.speaker === 'You' ? '#fda4af' : '#9ca3af' }}>
+                                        <p style={{ fontWeight: 600, marginBottom: '4px' }}>{msg.speaker} ({msg.time})</p>
+                                        <p>{msg.text}</p>
                                     </div>
                                 ))}
                             </div>
