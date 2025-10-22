@@ -142,6 +142,25 @@
                 return new Blob([view], { type: 'audio/wav' });
             };
 
+            const validatePcmData = (audioBytes) => {
+                if (audioBytes.length < 2) {
+                    console.error('PCM data too short:', audioBytes.length);
+                    return false;
+                }
+                let nonZeroCount = 0;
+                for (let i = 0; i < Math.min(audioBytes.length, 100); i++) {
+                    if (audioBytes[i] !== 0 && audioBytes[i] !== 255) {
+                        nonZeroCount++;
+                    }
+                }
+                const nonZeroRatio = nonZeroCount / Math.min(audioBytes.length, 100);
+                if (nonZeroRatio < 0.1) {
+                    console.error('PCM data appears invalid: too many zero or 255 bytes', nonZeroCount, 'non-zero in first 100 bytes');
+                    return false;
+                }
+                return true;
+            };
+
             const playAudioQueue = async () => {
                 if (isPlaying.current || audioQueue.current.length === 0) return;
                 isPlaying.current = true;
@@ -169,7 +188,7 @@
                 } catch (err) {
                     console.error('Audio decode error:', err.message);
                     isPlaying.current = false;
-                    setError('Failed to decode audio. Check fallback player.');
+                    setError('Failed to decode audio. Check fallback player or download raw WAV.');
                     playAudioQueue();
                 }
             };
@@ -282,9 +301,13 @@
                                 try {
                                     const audioBytes = Uint8Array.from(atob(data.audio_event.audio_base_64), c => c.charCodeAt(0));
                                     console.log('Audio bytes length:', audioBytes.length, 'First 10 bytes:', audioBytes.slice(0, 10));
-                                    if (audioBytes.length < 2) {
-                                        console.error('Audio data too short to process');
-                                        setError('Received invalid audio data (too short)');
+                                    if (!validatePcmData(audioBytes)) {
+                                        console.error('Invalid PCM data detected');
+                                        setError('Invalid audio data received. Download raw WAV to inspect.');
+                                        const wavBlob = createWavBlob(audioBytes);
+                                        const url = URL.createObjectURL(wavBlob);
+                                        setFallbackAudioUrl(url);
+                                        console.log('Fallback audio URL created:', url);
                                         return;
                                     }
                                     const audioBuffer = audioContext.current.createBuffer(1, audioBytes.length / 2, 16000);
@@ -297,7 +320,11 @@
                                     const buffer = audioBuffer.buffer;
                                     if (!buffer || buffer.byteLength === 0) {
                                         console.error('Invalid audio buffer created');
-                                        setError('Failed to create audio buffer');
+                                        setError('Failed to create audio buffer. Download raw WAV to inspect.');
+                                        const wavBlob = createWavBlob(audioBytes);
+                                        const url = URL.createObjectURL(wavBlob);
+                                        setFallbackAudioUrl(url);
+                                        console.log('Fallback audio URL created:', url);
                                         return;
                                     }
                                     audioQueue.current.push(buffer);
@@ -311,7 +338,7 @@
                                     console.log('Fallback audio URL created:', url);
                                 } catch (err) {
                                     console.error('Audio processing error:', err.message);
-                                    setError('Failed to process audio response. Check fallback player.');
+                                    setError('Failed to process audio response. Download raw WAV to inspect.');
                                     const audioBytes = Uint8Array.from(atob(data.audio_event.audio_base_64), c => c.charCodeAt(0));
                                     const wavBlob = createWavBlob(audioBytes);
                                     const url = URL.createObjectURL(wavBlob);
@@ -500,11 +527,14 @@
                             </button>
 
                             {fallbackAudioUrl && (
-                                <div style={{ marginTop: '16px' }}>
-                                    <p style={{ color: '#f59e0b', fontSize: '14px' }}>Audio decode failed. Use fallback player:</p>
+                                <div style={{ marginTop: '16px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                                    <p style={{ color: '#f59e0b', fontSize: '14px' }}>Audio decode failed. Use fallback player or download raw WAV:</p>
                                     <audio controls src={fallbackAudioUrl}>
                                         Your browser does not support the audio element.
                                     </audio>
+                                    <a href={fallbackAudioUrl} download="amaia_audio.wav" style={{ padding: '8px 16px', background: '#eab308', color: '#000', border: 'none', borderRadius: '9999px', fontWeight: '600', cursor: 'pointer', fontSize: '14px', textDecoration: 'none' }}>
+                                        Download Raw WAV
+                                    </a>
                                 </div>
                             )}
 
