@@ -1,337 +1,213 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Amaia - AI Voice Chat</title>
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎤</text></svg>">
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #000; color: #fff; }
-        .animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Amaia Voice Chat</title>
+  <style>
+    body {
+      background: #0e0e10;
+      color: #fff;
+      font-family: system-ui, sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+    }
+
+    h1 {
+      font-size: 2rem;
+      margin-bottom: 1rem;
+      color: #e1b3ff;
+    }
+
+    #transcript {
+      width: 80%;
+      max-width: 600px;
+      height: 300px;
+      background: #1c1c1f;
+      border-radius: 10px;
+      overflow-y: auto;
+      padding: 1rem;
+      margin-bottom: 1rem;
+      box-shadow: 0 0 10px #5c3d91;
+    }
+
+    #transcript div {
+      margin-bottom: 0.5rem;
+      line-height: 1.5;
+    }
+
+    .buttons {
+      display: flex;
+      gap: 1rem;
+    }
+
+    button {
+      background: #5c3d91;
+      color: white;
+      border: none;
+      padding: 0.75rem 1.5rem;
+      border-radius: 8px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+
+    button:hover {
+      background: #7b4fc3;
+    }
+
+    button:disabled {
+      background: #333;
+      cursor: not-allowed;
+    }
+  </style>
 </head>
 <body>
-    <div id="root"></div>
+  <h1>🎧 Talk with Amaia</h1>
+  <div id="transcript">
+    <div><em>Amaia:</em> Hi there — I’m ready whenever you are.</div>
+  </div>
+  <div class="buttons">
+    <button id="startBtn">Start Talking</button>
+    <button id="stopBtn">Stop</button>
+  </div>
 
-    <script type="text/babel">
-        const { useState, useRef, useEffect } = React;
+  <script>
+    let websocketRef = { current: null };
+    let audioContextRef = { current: null };
+    let mediaStreamRef = { current: null };
+    let isRecordingRef = { current: false };
+    let isPlayingRef = { current: false };
+    let audioQueueRef = { current: [] };
 
-        function AmaiaPlatform() {
-            const [currentPage, setCurrentPage] = useState('intro');
-            const [isOnCall, setIsOnCall] = useState(false);
-            const [isConnected, setIsConnected] = useState(false);
-            const [status, setStatus] = useState('Ready');
-            const [callTranscript, setCallTranscript] = useState([]);
-            const [error, setError] = useState(null);
-            
-            const websocketRef = useRef(null);
-            const mediaStreamRef = useRef(null);
-            const audioContextRef = useRef(null);
-            const audioQueueRef = useRef([]);
-            const isPlayingRef = useRef(false);
+    const addToTranscript = (speaker, text) => {
+      const transcriptDiv = document.getElementById('transcript');
+      const entry = document.createElement('div');
+      entry.textContent = `${speaker}: ${text}`;
+      transcriptDiv.appendChild(entry);
+      transcriptDiv.scrollTop = transcriptDiv.scrollHeight;
+    };
 
-            useEffect(() => {
-                audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
-                return () => {
-                    if (audioContextRef.current) audioContextRef.current.close();
-                };
-            }, []);
+    const connectWebSocket = async () => {
+      try {
+        const response = await fetch('http://localhost:3000/session');
+        const data = await response.json();
+        websocketRef.current = new WebSocket(data.ws_url);
 
-            const addToTranscript = (speaker, text) => {
-                if (text && text.trim()) {
-                    setCallTranscript(prev => [...prev, {
-                        speaker,
-                        text,
-                        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                    }]);
-                }
-            };
+        websocketRef.current.onopen = () => {
+          console.log('✅ Connected to Amaia session');
+        };
 
-            const playNextAudio = async () => {
-                if (isPlayingRef.current || audioQueueRef.current.length === 0) return;
-                
-                isPlayingRef.current = true;
-                const audioData = audioQueueRef.current.shift();
+        websocketRef.current.onmessage = async (event) => {
+          const data = JSON.parse(event.data);
 
-                try {
-                    // Create audio element and play directly
-                    const audioBlob = new Blob([audioData], { type: 'audio/mpeg' });
-                    const audioUrl = URL.createObjectURL(audioBlob);
-                    const audio = new Audio(audioUrl);
-                    
-                    audio.onended = () => {
-                        URL.revokeObjectURL(audioUrl);
-                        isPlayingRef.current = false;
-                        playNextAudio();
-                    };
+          // 🎤 USER SPEECH
+          if (data.type === 'user_transcript' && data.user_transcript_event?.transcript) {
+            addToTranscript('You', data.user_transcript_event.transcript);
+          }
 
-                    audio.onerror = (e) => {
-                        console.error('Audio playback error:', e);
-                        isPlayingRef.current = false;
-                        playNextAudio();
-                    };
+          // 🤖 AMAIA SPEECH (TEXT)
+          if (data.type === 'agent_response' && data.agent_response_event?.agent_response) {
+            addToTranscript('Amaia', data.agent_response_event.agent_response);
+          }
 
-                    await audio.play();
-                    console.log('Playing audio chunk');
-                } catch (err) {
-                    console.error('Audio play error:', err);
-                    isPlayingRef.current = false;
-                    playNextAudio();
-                }
-            };
+          // 🔊 AMAIA AUDIO
+          if (data.type === 'audio' && data.audio_event?.audio_chunk) {
+            const base64Audio = data.audio_event.audio_chunk;
+            const audioBytes = Uint8Array.from(atob(base64Audio), c => c.charCodeAt(0));
+            const audioBuffer = audioBytes.buffer;
+            audioQueueRef.current.push(audioBuffer);
+            playNextAudio();
+          }
+        };
 
-            const startCall = async () => {
-                setIsOnCall(true);
-                setCurrentPage('call');
-                setStatus('Connecting...');
-                setCallTranscript([{
-                    speaker: 'Amaia',
-                    text: "Hey, I'm so glad you called. Talk to me.",
-                    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                }]);
+        websocketRef.current.onclose = () => {
+          console.log('❌ WebSocket closed, retrying in 3 seconds...');
+          setTimeout(connectWebSocket, 3000);
+        };
+      } catch (err) {
+        console.error('❌ Failed to connect:', err);
+        setTimeout(connectWebSocket, 3000);
+      }
+    };
 
-                try {
-                    const response = await fetch('/api/signed-url');
-                    if (!response.ok) throw new Error('Failed to get signed URL');
-                    
-                    const data = await response.json();
-                    const signedUrl = data.signedUrl;
+    const startRecording = async () => {
+      if (isRecordingRef.current) return;
+      isRecordingRef.current = true;
 
-                    console.log('Connecting to WebSocket...');
-                    websocketRef.current = new WebSocket(signedUrl);
+      try {
+        audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        mediaStreamRef.current = stream;
 
-                    websocketRef.current.onopen = () => {
-                        console.log('WebSocket connected');
-                        setIsConnected(true);
-                        setStatus('Connected - Speak now');
-                        
-                        // Send initialization
-                        websocketRef.current.send(JSON.stringify({
-                            type: 'conversation_initiation_client_data'
-                        }));
+        const source = audioContextRef.current.createMediaStreamSource(stream);
+        const processor = audioContextRef.current.createScriptProcessor(4096, 1, 1);
 
-                        startMicrophone();
-                    };
+        source.connect(processor);
+        processor.connect(audioContextRef.current.destination);
 
-                    websocketRef.current.onmessage = (event) => {
-                        if (typeof event.data === 'string') {
-                            try {
-                                const data = JSON.parse(event.data);
-                                console.log('Message type:', data.type);
+        processor.onaudioprocess = (e) => {
+          if (!isRecordingRef.current) return;
+          const input = e.inputBuffer.getChannelData(0);
+          const pcm16 = new Int16Array(input.length);
+          for (let i = 0; i < input.length; i++) {
+            pcm16[i] = Math.max(-1, Math.min(1, input[i])) * 0x7fff;
+          }
 
-                                // Handle text responses
-                                if (data.type === 'agent_response' && data.agent_response_event?.agent_response) {
-                                    addToTranscript('Amaia', data.agent_response_event.agent_response);
-                                }
+          if (websocketRef.current && websocketRef.current.readyState === WebSocket.OPEN) {
+            websocketRef.current.send(pcm16);
+          }
+        };
 
-                                // Handle audio
-                                if (data.type === 'audio' && data.audio_event?.audio_base_64) {
-                                    const audioBytes = Uint8Array.from(atob(data.audio_event.audio_base_64), c => c.charCodeAt(0));
-                                    audioQueueRef.current.push(audioBytes.buffer);
-                                    playNextAudio();
-                                }
+        console.log('🎙️ Recording started');
+      } catch (err) {
+        console.error('❌ Microphone access error:', err);
+      }
+    };
 
-                                // Handle interruptions
-                                if (data.type === 'interruption') {
-                                    audioQueueRef.current = [];
-                                    isPlayingRef.current = false;
-                                }
+    const stopRecording = () => {
+      isRecordingRef.current = false;
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach(track => track.stop());
+        mediaStreamRef.current = null;
+      }
+      console.log('🛑 Recording stopped');
+    };
 
-                            } catch (err) {
-                                console.error('Parse error:', err);
-                            }
-                        }
-                    };
+    const playNextAudio = async () => {
+      if (isPlayingRef.current || audioQueueRef.current.length === 0) return;
 
-                    websocketRef.current.onerror = (err) => {
-                        console.error('WebSocket error:', err);
-                        setError('Connection error');
-                    };
+      isPlayingRef.current = true;
+      const audioData = audioQueueRef.current.shift();
 
-                    websocketRef.current.onclose = () => {
-                        console.log('WebSocket closed');
-                        setIsConnected(false);
-                        setStatus('Disconnected');
-                        stopMicrophone();
-                    };
+      try {
+        const audioContext = audioContextRef.current;
+        const audioBuffer = await audioContext.decodeAudioData(audioData.slice(0));
 
-                } catch (err) {
-                    console.error('Connection error:', err);
-                    setError(err.message);
-                }
-            };
+        const source = audioContext.createBufferSource();
+        source.buffer = audioBuffer;
+        source.connect(audioContext.destination);
+        source.onended = () => {
+          isPlayingRef.current = false;
+          playNextAudio();
+        };
+        source.start(0);
+        console.log('🔊 Playing Amaia’s response');
+      } catch (err) {
+        console.error('❌ Audio decoding failed:', err);
+        isPlayingRef.current = false;
+        playNextAudio();
+      }
+    };
 
-            const startMicrophone = async () => {
-                try {
-                    const stream = await navigator.mediaDevices.getUserMedia({
-                        audio: {
-                            sampleRate: 16000,
-                            channelCount: 1,
-                            echoCancellation: true,
-                            noiseSuppression: true
-                        }
-                    });
-                    
-                    mediaStreamRef.current = stream;
-                    const source = audioContextRef.current.createMediaStreamSource(stream);
-                    const processor = audioContextRef.current.createScriptProcessor(2048, 1, 1);
+    connectWebSocket();
 
-                    source.connect(processor);
-                    processor.connect(audioContextRef.current.destination);
-
-                    processor.onaudioprocess = (e) => {
-                        if (websocketRef.current?.readyState === WebSocket.OPEN) {
-                            const input = e.inputBuffer.getChannelData(0);
-                            const buffer = new ArrayBuffer(input.length * 2);
-                            const view = new DataView(buffer);
-
-                            for (let i = 0; i < input.length; i++) {
-                                const s = Math.max(-1, Math.min(1, input[i]));
-                                view.setInt16(i * 2, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
-                            }
-
-                            const base64 = btoa(String.fromCharCode(...new Uint8Array(buffer)));
-                            websocketRef.current.send(JSON.stringify({
-                                user_audio_chunk: base64
-                            }));
-                        }
-                    };
-
-                    console.log('Microphone started');
-                    setStatus('Listening...');
-
-                } catch (err) {
-                    console.error('Microphone error:', err);
-                    setError('Microphone access denied');
-                }
-            };
-
-            const stopMicrophone = () => {
-                if (mediaStreamRef.current) {
-                    mediaStreamRef.current.getTracks().forEach(track => track.stop());
-                    mediaStreamRef.current = null;
-                }
-            };
-
-            const endCall = () => {
-                if (websocketRef.current) websocketRef.current.close();
-                stopMicrophone();
-                audioQueueRef.current = [];
-                isPlayingRef.current = false;
-                setIsOnCall(false);
-                setCurrentPage('intro');
-                setCallTranscript([]);
-                setStatus('Ready');
-                setError(null);
-            };
-
-            // INTRO PAGE
-            if (currentPage === 'intro') {
-                return (
-                    <div style={{ minHeight: '100vh', background: '#000', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden' }}>
-                        <div style={{ position: 'absolute', inset: 0, opacity: 0.2 }}>
-                            <div style={{ position: 'absolute', top: '80px', left: '40px', width: '384px', height: '384px', background: '#ec4899', borderRadius: '9999px', filter: 'blur(80px)' }} className="animate-pulse" />
-                            <div style={{ position: 'absolute', bottom: '80px', right: '40px', width: '320px', height: '320px', background: '#a855f7', borderRadius: '9999px', filter: 'blur(80px)', animationDelay: '1s' }} className="animate-pulse" />
-                        </div>
-
-                        <div style={{ position: 'relative', zIndex: 10, maxWidth: '448px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '32px', textAlign: 'center' }}>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                                <div style={{ width: '96px', height: '96px', margin: '0 auto', borderRadius: '9999px', background: 'linear-gradient(135deg, #ec4899, #a855f7)', boxShadow: '0 0 50px rgba(236, 72, 153, 0.5)' }} className="animate-pulse" />
-                                <div>
-                                    <h1 style={{ fontSize: '48px', fontWeight: 300, letterSpacing: '0.1em', marginBottom: '8px' }}>Amaia</h1>
-                                    <p style={{ color: '#9ca3af', fontSize: '14px' }}>is calling...</p>
-                                </div>
-                            </div>
-
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                                <div style={{ width: '8px', height: '8px', background: '#4ade80', borderRadius: '9999px' }} className="animate-pulse" />
-                                <p style={{ fontSize: '12px', color: '#9ca3af' }}>live voice call</p>
-                            </div>
-
-                            <button onClick={startCall} style={{ padding: '16px 48px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '9999px', fontWeight: 600, cursor: 'pointer', fontSize: '16px', boxShadow: '0 0 20px rgba(22, 163, 74, 0.5)' }}>
-                                📞 Answer
-                            </button>
-
-                            <p style={{ fontSize: '12px', color: '#4b5563', marginTop: '16px' }}>
-                                Real voice conversation with Amaia
-                            </p>
-                            {error && <p style={{ color: '#dc2626', fontSize: '14px' }}>{error}</p>}
-                        </div>
-                    </div>
-                );
-            }
-
-            // CALL PAGE
-            if (currentPage === 'call') {
-                return (
-                    <div style={{ minHeight: '100vh', background: 'linear-gradient(to bottom, #030712, #000)', color: '#fff', display: 'flex', flexDirection: 'column' }}>
-                        {/* Header */}
-                        <div style={{ position: 'sticky', top: 0, zIndex: 40, background: 'rgba(0, 0, 0, 0.8)', backdropFilter: 'blur(12px)', borderBottom: '1px solid #1f2937' }}>
-                            <div style={{ maxWidth: '1024px', margin: '0 auto', padding: '0 16px', height: '64px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                <div style={{ textAlign: 'center', flex: 1 }}>
-                                    <h2 style={{ fontWeight: 600 }}>Amaia</h2>
-                                    <p style={{ fontSize: '12px', color: isConnected ? '#4ade80' : '#9ca3af' }}>
-                                        {isConnected ? 'on call' : 'connecting...'}
-                                    </p>
-                                </div>
-                                <button onClick={endCall} style={{ background: '#dc2626', border: 'none', borderRadius: '9999px', padding: '12px', color: '#fff', cursor: 'pointer', fontSize: '20px' }}>
-                                    📞
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Main */}
-                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 16px', gap: '48px' }}>
-                            <div style={{ width: '128px', height: '128px', borderRadius: '9999px', background: 'linear-gradient(135deg, #ec4899, #a855f7)', boxShadow: '0 0 50px rgba(236, 72, 153, 0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px' }} className={isConnected ? 'animate-pulse' : ''}>
-                                🎤
-                            </div>
-
-                            <div style={{ textAlign: 'center' }}>
-                                <p style={{ color: '#9ca3af', fontSize: '14px' }}>{status}</p>
-                                {error && <p style={{ color: '#dc2626', fontSize: '14px', marginTop: '8px' }}>{error}</p>}
-                            </div>
-
-                            {callTranscript.length > 1 && (
-                                <div style={{ maxWidth: '448px', display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '200px', overflowY: 'auto' }}>
-                                    {callTranscript.slice(-3).map((msg, i) => (
-                                        <div key={i} style={{ fontSize: '14px', color: msg.speaker === 'You' ? '#fda4af' : '#d1d5db' }}>
-                                            <p style={{ fontSize: '12px', color: '#4b5563', marginBottom: '4px' }}>
-                                                {msg.speaker} • {msg.time}
-                                            </p>
-                                            <p style={{ fontStyle: 'italic' }}>{msg.text}</p>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Transcript */}
-                        <div style={{ background: 'rgba(0, 0, 0, 0.5)', borderTop: '1px solid #1f2937', padding: '24px 16px', maxHeight: '192px', overflowY: 'auto' }}>
-                            <p style={{ fontSize: '12px', color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '16px' }}>
-                                Full Conversation
-                            </p>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                {callTranscript.map((msg, i) => (
-                                    <div key={i} style={{ fontSize: '12px', color: msg.speaker === 'You' ? '#fda4af' : '#9ca3af' }}>
-                                        <p style={{ fontWeight: 600, marginBottom: '4px' }}>
-                                            {msg.speaker} • {msg.time}
-                                        </p>
-                                        <p>{msg.text}</p>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-                );
-            }
-        }
-
-        ReactDOM.render(<AmaiaPlatform />, document.getElementById('root'));
-    </script>
+    document.getElementById('startBtn').addEventListener('click', startRecording);
+    document.getElementById('stopBtn').addEventListener('click', stopRecording);
+  </script>
 </body>
 </html>
