@@ -29,6 +29,7 @@
             const [callTranscript, setCallTranscript] = useState([]);
             const [error, setError] = useState(null);
             const [audioAllowed, setAudioAllowed] = useState(false);
+            const [fallbackAudioUrl, setFallbackAudioUrl] = useState(null);
             const websocketRef = useRef(null);
             const audioContext = useRef(new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 }));
             const scriptProcessorRef = useRef(null);
@@ -119,6 +120,10 @@
                 } catch (err) {
                     console.error('Audio decode error:', err.message);
                     isPlaying.current = false;
+                    const blob = new Blob([chunk], { type: 'audio/mpeg' });
+                    const url = URL.createObjectURL(blob);
+                    setFallbackAudioUrl(url);
+                    console.log('Fallback audio URL:', url);
                     playAudioQueue();
                 }
             };
@@ -127,7 +132,7 @@
                 try {
                     console.log('Fetching signed URL...');
                     const response = await fetch('/api/signed-url');
-                    if (!response.ok) throw new Error('Failed to get signed URL');
+                    if (!response.ok) throw new Error(`Failed to get signed URL: ${response.status}`);
                     const data = await response.json();
                     console.log('Signed URL received:', data.signedUrl.slice(0, 50) + '...');
                     return data.signedUrl;
@@ -200,29 +205,17 @@
                                 }
                                 audioQueue.current.push(buffer);
                                 playAudioQueue();
+                            } else if (data.type === 'error') {
+                                console.error('Server error:', data.error);
+                                setError(`Server error: ${data.error.message || 'Unknown error'}`);
                             }
                         } catch (err) {
                             console.error('JSON parse error:', err.message);
-                            console.log('Non-JSON message:', event.data);
+                            setError('Failed to parse server response');
                         }
-                    } else if (event.data instanceof Blob) {
-                        console.log('Received audio blob, size:', event.data.size);
-                        event.data.arrayBuffer().then(buffer => {
-                            audioQueue.current.push(buffer);
-                            playAudioQueue();
-                        }).catch(err => {
-                            console.error('Audio buffer error:', err.message);
-                            setError('Failed to process audio data');
-                        });
                     } else {
-                        console.log('Received unknown data type:', typeof event.data);
-                        const debugBlob = new Blob([event.data], { type: 'application/octet-stream' });
-                        const debugUrl = URL.createObjectURL(debugBlob);
-                        const debugLink = document.createElement('a');
-                        debugLink.href = debugUrl;
-                        debugLink.download = `unknown_response_${Date.now()}.bin`;
-                        debugLink.click();
-                        console.log('Saved unknown data as unknown_response_[timestamp].bin');
+                        console.error('Received unexpected binary data');
+                        setError('Received invalid data from server');
                     }
                 };
 
@@ -268,6 +261,8 @@
                             const base64 = arrayBufferToBase64(buffer);
                             websocketRef.current.send(JSON.stringify({ user_audio_chunk: base64 }));
                             console.log('Sent PCM audio chunk, size:', buffer.byteLength, 'bytes (base64 length:', base64.length, ')');
+                        } else {
+                            console.log('Skipped audio chunk, size:', e.inputBuffer.length * 2, 'WebSocket state:', websocketRef.current?.readyState);
                         }
                     };
                     console.log('Microphone streaming started (PCM 16000Hz)');
