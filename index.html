@@ -19,8 +19,6 @@
 </head>
 <body>
     <div id="root"></div>
-    <audio id="audio-player" style="display: none;"></audio>
-    <audio id="fallback-player" controls style="margin: 16px auto; display: none;"></audio>
 
     <script type="text/babel">
         const { useState, useRef, useEffect } = React;
@@ -28,31 +26,25 @@
         function AmaiaPlatform() {
             const [currentPage, setCurrentPage] = useState('intro');
             const [isOnCall, setIsOnCall] = useState(false);
-            const [isRecording, setIsRecording] = useState(false);
-            const [isThinking, setIsThinking] = useState(false);
-            const [muted, setMuted] = useState(false);
+            const [isConnected, setIsConnected] = useState(false);
+            const [status, setStatus] = useState('Amaia is online');
             const [callTranscript, setCallTranscript] = useState([]);
             const [error, setError] = useState(null);
             const [audioAllowed, setAudioAllowed] = useState(false);
-            const [lastAudioUrl, setLastAudioUrl] = useState(null);
-            const recognitionRef = useRef(null);
-            const audioRef = useRef(document.getElementById('audio-player'));
-            const fallbackAudioRef = useRef(document.getElementById('fallback-player'));
-            const audioContextRef = useRef(null);
+            const websocketRef = useRef(null);
+            const mediaRecorderRef = useRef(null);
+            const audioContext = useRef(new (window.AudioContext || window.webkitAudioContext)());
+            const audioQueue = useRef([]);
+            const isPlaying = useRef(false);
+            const recognitionRef = useRef(null); // For local transcription UI
 
-            // Initialize audio context
+            // Unlock audio context
             useEffect(() => {
                 const unlockAudio = () => {
-                    if (!audioContextRef.current) {
-                        audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
-                    }
-                    audioContextRef.current.resume().then(() => {
-                        console.log('Audio context resumed');
+                    audioContext.current.resume().then(() => {
+                        console.log('Audio context unlocked');
                         setAudioAllowed(true);
-                    }).catch(e => {
-                        console.error('Audio context resume error:', e);
-                        setError('Audio playback blocked. Click anywhere to enable audio.');
-                    });
+                    }).catch(e => console.error('Audio unlock error:', e));
                 };
                 document.addEventListener('click', unlockAudio);
                 document.addEventListener('touchstart', unlockAudio);
@@ -62,229 +54,166 @@
                 };
             }, []);
 
-            // Initialize speech recognition
+            // Local speech recognition for UI transcript (optional, for user messages)
             useEffect(() => {
                 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
                 if (SpeechRecognition) {
                     recognitionRef.current = new SpeechRecognition();
-                    recognitionRef.current.continuous = false;
-                    recognitionRef.current.interimResults = false;
+                    recognitionRef.current.continuous = true; // Continuous for streaming
+                    recognitionRef.current.interimResults = true;
                     recognitionRef.current.lang = 'en-US';
 
-                    recognitionRef.current.onstart = () => {
-                        console.log('Speech recognition started');
-                        setIsRecording(true);
-                    };
-                    recognitionRef.current.onend = () => {
-                        console.log('Speech recognition ended');
-                        setIsRecording(false);
-                    };
                     recognitionRef.current.onresult = (event) => {
+                        let transcript = '';
                         for (let i = event.resultIndex; i < event.results.length; i++) {
-                            if (event.results[i].isFinal) {
-                                handleUserSpeech(event.results[i][0].transcript);
-                            }
+                            transcript += event.results[i][0].transcript + ' ';
+                        }
+                        if (transcript.trim()) {
+                            // Update UI with interim transcript (optional)
+                            console.log('Interim transcript:', transcript);
+                        }
+                        if (event.results[event.results.length - 1].isFinal) {
+                            const finalTranscript = event.results[event.results.length - 1][0].transcript;
+                            addToTranscript('You', finalTranscript);
                         }
                     };
-                    recognitionRef.current.onerror = (event) => {
-                        console.error('Speech error:', event.error);
-                        setIsRecording(false);
-                        setError('Microphone error: ' + event.error);
-                    };
-                } else {
-                    console.error('Speech Recognition not supported');
-                    setError('Speech Recognition not supported in this browser');
+                    recognitionRef.current.onerror = (event) => console.error('Speech error:', event.error);
                 }
             }, []);
 
-            const playAudio = () => {
-                console.log('Play Audio button clicked');
-                if (!audioAllowed) {
-                    console.log('Audio context not allowed yet');
-                    setError('Audio playback blocked. Click anywhere to enable audio.');
-                    return;
-                }
-                if (!lastAudioUrl) {
-                    console.log('No audio URL available');
-                    setError('No audio available to play.');
-                    return;
-                }
-                if (muted) {
-                    console.log('Audio muted');
-                    setError('Audio is muted. Unmute to play.');
-                    return;
-                }
-
-                console.log('Attempting manual audio playback:', lastAudioUrl.slice(0, 50) + '...');
-                audioRef.current.src = lastAudioUrl;
-                audioRef.current.play().then(() => {
-                    console.log('Manual audio playback started (mpeg)');
-                }).catch(e => {
-                    console.error('Manual audio play error (mpeg):', e);
-                    const mp3Url = lastAudioUrl.replace('audio/mpeg', 'audio/mp3');
-                    audioRef.current.src = mp3Url;
-                    audioRef.current.play().then(() => {
-                        console.log('Manual audio playback started (mp3)');
-                    }).catch(e => {
-                        console.error('Manual audio play error (mp3):', e);
-                        setError('Failed to play audio: ' + e.message);
-                        fallbackAudioRef.current.style.display = 'block';
-                        fallbackAudioRef.current.src = lastAudioUrl;
-                    });
-                });
+            const addToTranscript = (speaker, text) => {
+                setCallTranscript(prev => [...prev, `${speaker}: ${text}`]);
             };
 
-            const downloadAudio = () => {
-                if (lastAudioUrl) {
-                    console.log('Download audio clicked');
-                    const link = document.createElement('a');
-                    link.href = lastAudioUrl;
-                    link.download = 'amaia_response.mp3';
-                    document.body.appendChild(link);
-                    link.click();
-                    document.body.removeChild(link);
-                }
-            };
-
-            const handleUserSpeech = async (transcript) => {
-                if (!transcript.trim()) return;
-
-                console.log('User speech transcribed:', transcript);
-
-                const userMessage = {
-                    id: Date.now(),
-                    sender: 'user',
-                    text: transcript,
-                    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                };
-                setCallTranscript(prev => {
-                    console.log('Adding user transcript:', userMessage);
-                    return [...prev, userMessage];
-                });
-
-                setIsThinking(true);
-                setError(null);
-
+            const playAudioQueue = async () => {
+                if (isPlaying.current || audioQueue.current.length === 0) return;
+                isPlaying.current = true;
+                const chunk = audioQueue.current.shift();
                 try {
-                    const response = await fetch('/api/chat', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ message: transcript })
-                    });
-
-                    console.log('Response status:', response.status);
-                    const responseText = await response.text();
-                    console.log('Raw response:', responseText);
-
-                    if (!response.ok) {
-                        throw new Error(`Backend error: ${response.status} - ${responseText}`);
-                    }
-
-                    let data;
-                    try {
-                        data = JSON.parse(responseText);
-                    } catch (e) {
-                        console.error('JSON parse error:', e);
-                        throw new Error('Invalid response format from server');
-                    }
-
-                    console.log('Backend response:', data);
-
-                    if (data.error) {
-                        throw new Error(data.error);
-                    }
-
-                    if (data.reply) {
-                        const amaiaMessage = {
-                            id: Date.now() + 1,
-                            sender: 'amaia',
-                            text: data.reply,
-                            time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                        };
-                        setCallTranscript(prev => {
-                            console.log('Adding Amaia transcript:', amaiaMessage);
-                            return [...prev, amaiaMessage];
-                        });
-
-                        if (data.audioUrl) {
-                            setLastAudioUrl(data.audioUrl);
-                            if (!muted && audioAllowed) {
-                                console.log('Attempting to auto-play audio:', data.audioUrl.slice(0, 50) + '...');
-                                audioRef.current.src = data.audioUrl;
-                                audioRef.current.play().then(() => {
-                                    console.log('Auto-play started (mpeg)');
-                                }).catch(e => {
-                                    console.error('Auto audio play error (mpeg):', e);
-                                    const mp3Url = data.audioUrl.replace('audio/mpeg', 'audio/mp3');
-                                    audioRef.current.src = mp3Url;
-                                    audioRef.current.play().then(() => {
-                                        console.log('Auto-play started (mp3)');
-                                    }).catch(e => {
-                                        console.error('Auto audio play error (mp3):', e);
-                                        setError('Auto-play failed. Click "Play Audio" or use fallback player.');
-                                        fallbackAudioRef.current.style.display = 'block';
-                                        fallbackAudioRef.current.src = data.audioUrl;
-                                    });
-                                });
-                            }
-                        }
-                    } else {
-                        console.warn('No reply in response');
-                        setError('No response from Amaia');
-                    }
-                } catch (error) {
-                    console.error('Chat error:', error);
-                    setError(error.message);
-                    const errorMessage = {
-                        id: Date.now() + 1,
-                        sender: 'amaia',
-                        text: 'Sorry, I had trouble hearing that. Try again?',
-                        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                    const buffer = await audioContext.current.decodeAudioData(chunk);
+                    const source = audioContext.current.createBufferSource();
+                    source.buffer = buffer;
+                    source.connect(audioContext.current.destination);
+                    source.start();
+                    source.onended = () => {
+                        isPlaying.current = false;
+                        playAudioQueue();
                     };
-                    setCallTranscript(prev => {
-                        console.log('Adding error transcript:', errorMessage);
-                        return [...prev, errorMessage];
-                    });
-                } finally {
-                    setIsThinking(false);
+                } catch (err) {
+                    console.error('Audio decode error:', err);
+                    isPlaying.current = false;
+                    playAudioQueue();
                 }
             };
 
-            const startListening = () => {
-                if (recognitionRef.current && !isRecording) {
-                    console.log('Starting speech recognition');
-                    recognitionRef.current.start();
+            const getSignedUrl = async () => {
+                try {
+                    console.log('Fetching signed URL...');
+                    const response = await fetch('/api/signed-url');
+                    if (!response.ok) throw new Error('Failed to get signed URL');
+                    const data = await response.json();
+                    console.log('Signed URL received');
+                    return data.signedUrl;
+                } catch (error) {
+                    console.error('Signed URL error:', error);
+                    setError('Failed to connect to Amaia. Check console.');
+                    return null;
                 }
             };
 
-            const stopListening = () => {
-                if (recognitionRef.current && isRecording) {
-                    console.log('Stopping speech recognition');
-                    recognitionRef.current.stop();
-                }
-            };
-
-            const startCall = () => {
+            const startCall = async () => {
                 setIsOnCall(true);
                 setCurrentPage('call');
-                const welcomeMessage = {
-                    id: 0,
-                    sender: 'amaia',
-                    text: "Hey, I'm so glad you called. Talk to me.",
-                    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                setStatus('Connecting to Amaia...');
+                setCallTranscript([{
+                    speaker: 'Amaia',
+                    text: "Hey, I'm so glad you called. Talk to me."
+                }]);
+
+                const signedUrl = await getSignedUrl();
+                if (!signedUrl) return;
+
+                console.log('Connecting to WebSocket:', signedUrl);
+                websocketRef.current = new WebSocket(signedUrl);
+
+                websocketRef.current.onopen = () => {
+                    console.log('WebSocket connected');
+                    setIsConnected(true);
+                    setStatus('Connected! Speak to Amaia.');
+                    // Start mic streaming
+                    startMicrophone();
+                    // Optional: Send initiation if needed
+                    websocketRef.current.send(JSON.stringify({ type: 'conversation_initiation_client_data' }));
                 };
-                setCallTranscript([welcomeMessage]);
-                console.log('Call started, transcript initialized:', welcomeMessage);
+
+                websocketRef.current.onmessage = (event) => {
+                    if (typeof event.data === 'string') {
+                        try {
+                            const data = JSON.parse(event.data);
+                            console.log('Received text:', data);
+                            if (data.type === 'agent_response' || data.type === 'text') {
+                                addToTranscript('Amaia', data.text || data.message || 'Thinking...');
+                            }
+                        } catch (err) {
+                            console.log('Non-JSON message:', event.data);
+                        }
+                    } else if (event.data instanceof Blob) {
+                        event.data.arrayBuffer().then(buffer => {
+                            audioQueue.current.push(buffer);
+                            playAudioQueue();
+                        }).catch(err => console.error('Audio buffer error:', err));
+                    }
+                };
+
+                websocketRef.current.onerror = (err) => {
+                    console.error('WebSocket error:', err);
+                    setError('Connection error. Try again.');
+                };
+
+                websocketRef.current.onclose = () => {
+                    console.log('WebSocket closed');
+                    setIsConnected(false);
+                    setStatus('Disconnected');
+                    stopMicrophone();
+                };
+            };
+
+            const startMicrophone = async () => {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    mediaRecorderRef.current = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' });
+                    mediaRecorderRef.current.ondataavailable = (event) => {
+                        if (event.data.size > 0 && websocketRef.current && websocketRef.current.readyState === WebSocket.OPEN) {
+                            websocketRef.current.send(event.data);
+                        }
+                    };
+                    mediaRecorderRef.current.start(250); // Send chunks every 250ms
+                    console.log('Microphone streaming started');
+                    setStatus('Listening...');
+                    if (recognitionRef.current) recognitionRef.current.start();
+                } catch (err) {
+                    console.error('Mic error:', err);
+                    setError('Microphone permission denied.');
+                }
+            };
+
+            const stopMicrophone = () => {
+                if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+                    mediaRecorderRef.current.stop();
+                    mediaRecorderRef.current = null;
+                }
+                if (recognitionRef.current) recognitionRef.current.stop();
+                console.log('Microphone stopped');
             };
 
             const endCall = () => {
+                if (websocketRef.current) websocketRef.current.close();
+                stopMicrophone();
                 setIsOnCall(false);
                 setCurrentPage('intro');
                 setCallTranscript([]);
-                setLastAudioUrl(null);
-                stopListening();
+                setStatus('Amaia is online');
                 setError(null);
-                console.log('Call ended');
             };
 
             // INTRO PAGE
@@ -307,7 +236,7 @@
 
                             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
                                 <div style={{ width: '8px', height: '8px', background: '#4ade80', borderRadius: '9999px' }} className="animate-pulse" />
-                                <p style={{ fontSize: '12px', color: '#9ca3af' }}>live voice chat</p>
+                                <p style={{ fontSize: '12px', color: '#9ca3af' }}>live voice call</p>
                             </div>
 
                             <div style={{ display: 'flex', gap: '16px', justifyContent: 'center' }}>
@@ -317,7 +246,7 @@
                             </div>
 
                             <p style={{ fontSize: '12px', color: '#4b5563', marginTop: '32px' }}>
-                                Welcome to Amaia's world. Real voice conversation.
+                                Welcome to Amaia's world. Real voice conversation powered by ElevenLabs agent.
                             </p>
                             {error && <p style={{ color: '#dc2626', fontSize: '14px', fontWeight: 500 }}>{error}</p>}
                         </div>
@@ -333,11 +262,8 @@
                             <div style={{ maxWidth: '1024px', margin: '0 auto', padding: '0 16px', height: '64px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                 <div style={{ textAlign: 'center', flex: 1 }}>
                                     <h2 style={{ fontWeight: 600 }}>Amaia</h2>
-                                    <p style={{ fontSize: '12px', color: '#4ade80' }}>on call</p>
+                                    <p style={{ fontSize: '12px', color: '#4ade80' }}>{isConnected ? 'on call' : 'connecting...'}</p>
                                 </div>
-                                <button onClick={() => setMuted(!muted)} style={{ background: 'none', border: 'none', color: '#9ca3af', cursor: 'pointer', marginRight: '16px', fontSize: '20px' }}>
-                                    {muted ? '🔇' : '🔊'}
-                                </button>
                                 <button onClick={endCall} style={{ background: '#dc2626', border: 'none', borderRadius: '9999px', padding: '12px', color: '#fff', cursor: 'pointer', fontSize: '20px' }}>
                                     📞
                                 </button>
@@ -346,103 +272,31 @@
 
                         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 16px', gap: '48px' }}>
                             <div style={{ position: 'relative' }}>
-                                <div style={{ width: '128px', height: '128px', borderRadius: '9999px', background: 'linear-gradient(135deg, #ec4899, #a855f7)', boxShadow: '0 0 50px rgba(236, 72, 153, 0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px' }} className={isRecording ? 'animate-pulse' : isThinking ? 'animate-bounce' : ''}>
+                                <div style={{ width: '128px', height: '128px', borderRadius: '9999px', background: 'linear-gradient(135deg, #ec4899, #a855f7)', boxShadow: '0 0 50px rgba(236, 72, 153, 0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px' }} className={isConnected ? 'animate-pulse' : ''}>
                                     🎤
                                 </div>
-                                {isThinking && (
-                                    <div style={{ position: 'absolute', inset: 0, borderRadius: '9999px', border: '4px solid #ec4899' }} className="animate-pulse" />
-                                )}
                             </div>
 
                             <div style={{ textAlign: 'center' }}>
-                                {isRecording && <p style={{ color: '#f472b6', fontSize: '14px', fontWeight: 500 }} className="animate-pulse">Listening...</p>}
-                                {isThinking && <p style={{ color: '#c084fc', fontSize: '14px', fontWeight: 500 }} className="animate-pulse">Amaia is thinking...</p>}
-                                {!isRecording && !isThinking && <p style={{ color: '#9ca3af', fontSize: '14px' }}>Ready to listen</p>}
+                                <p style={{ color: '#9ca3af', fontSize: '14px' }}>{status}</p>
                                 {error && <p style={{ color: '#dc2626', fontSize: '14px', fontWeight: 500 }}>{error}</p>}
                             </div>
 
-                            {callTranscript.length > 1 && (
-                                <div style={{ maxWidth: '448px', display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '128px', overflowY: 'auto' }}>
-                                    {callTranscript.slice(-2).map(msg => (
-                                        <div key={msg.id} style={{ fontSize: '14px', color: msg.sender === 'user' ? '#fda4af' : '#d1d5db' }}>
-                                            <p style={{ fontSize: '12px', color: '#4b5563', marginBottom: '4px' }}>{msg.sender === 'user' ? 'You' : 'Amaia'}</p>
-                                            <p style={{ fontStyle: 'italic' }}>{msg.text}</p>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-
-                            <div style={{ display: 'flex', gap: '16px' }}>
-                                <button
-                                    onClick={isRecording ? stopListening : startListening}
-                                    disabled={isThinking}
-                                    style={{
-                                        position: 'relative',
-                                        width: '80px',
-                                        height: '80px',
-                                        borderRadius: '9999px',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        transform: isRecording ? 'scale(1.1)' : 'scale(1)',
-                                        background: isRecording ? '#dc2626' : '#ec4899',
-                                        border: 'none',
-                                        color: '#fff',
-                                        fontSize: '28px',
-                                        cursor: isThinking ? 'not-allowed' : 'pointer',
-                                        opacity: isThinking ? 0.5 : 1,
-                                        boxShadow: isRecording ? '0 0 20px rgba(220, 38, 38, 0.5)' : '0 0 20px rgba(236, 72, 153, 0.5)'
-                                    }}
-                                >
-                                    {isRecording ? '🎙️' : '🎤'}
-                                </button>
-                                <button
-                                    onClick={() => {
-                                        console.log('Play Audio button clicked (wrapper)');
-                                        playAudio();
-                                    }}
-                                    disabled={!lastAudioUrl || isThinking}
-                                    style={{
-                                        padding: '16px 32px',
-                                        background: lastAudioUrl && !isThinking ? '#16a34a' : '#4b5563',
-                                        color: '#fff',
-                                        border: 'none',
-                                        borderRadius: '9999px',
-                                        fontWeight: '600',
-                                        cursor: lastAudioUrl && !isThinking ? 'pointer' : 'not-allowed',
-                                        fontSize: '14px',
-                                        boxShadow: lastAudioUrl && !isThinking ? '0 0 20px rgba(22, 163, 74, 0.5)' : 'none'
-                                    }}
-                                >
-                                    ▶️ Play Audio
-                                </button>
-                                <button
-                                    onClick={downloadAudio}
-                                    disabled={!lastAudioUrl}
-                                    style={{
-                                        padding: '16px 32px',
-                                        background: lastAudioUrl ? '#0284c7' : '#4b5563',
-                                        color: '#fff',
-                                        border: 'none',
-                                        borderRadius: '9999px',
-                                        fontWeight: '600',
-                                        cursor: lastAudioUrl ? 'pointer' : 'not-allowed',
-                                        fontSize: '14px',
-                                        boxShadow: lastAudioUrl ? '0 0 20px rgba(2, 132, 199, 0.5)' : 'none'
-                                    }}
-                                >
-                                    ⬇️ Download Audio
-                                </button>
+                            <div style={{ maxWidth: '448px', display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '200px', overflowY: 'auto' }}>
+                                {callTranscript.map((msg, i) => (
+                                    <div key={i} style={{ fontSize: '14px', color: msg.startsWith('You') ? '#fda4af' : '#d1d5db' }}>
+                                        <p>{msg}</p>
+                                    </div>
+                                ))}
                             </div>
                         </div>
 
                         <div style={{ background: 'rgba(0, 0, 0, 0.5)', borderTop: '1px solid #1f2937', padding: '24px 16px', maxHeight: '192px', overflowY: 'auto' }}>
                             <p style={{ fontSize: '12px', color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '16px' }}>Call History</p>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                {callTranscript.map(msg => (
-                                    <div key={msg.id} style={{ fontSize: '12px', color: msg.sender === 'user' ? '#fda4af' : '#9ca3af' }}>
-                                        <p style={{ fontWeight: 600, marginBottom: '4px' }}>{msg.sender === 'user' ? 'You' : 'Amaia'}</p>
-                                        <p style={{ lineHeight: 1.5 }}>{msg.text}</p>
+                                {callTranscript.map((msg, i) => (
+                                    <div key={i} style={{ fontSize: '12px', color: msg.startsWith('You') ? '#fda4af' : '#9ca3af' }}>
+                                        <p>{msg}</p>
                                     </div>
                                 ))}
                             </div>
