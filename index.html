@@ -20,6 +20,7 @@
 <body>
     <div id="root"></div>
     <audio id="audio-player" style="display: none;"></audio>
+    <audio id="fallback-player" controls style="margin: 16px auto; display: none;"></audio>
 
     <script type="text/babel">
         const { useState, useRef, useEffect } = React;
@@ -36,6 +37,7 @@
             const [lastAudioUrl, setLastAudioUrl] = useState(null);
             const recognitionRef = useRef(null);
             const audioRef = useRef(document.getElementById('audio-player'));
+            const fallbackAudioRef = useRef(document.getElementById('fallback-player'));
             const audioContextRef = useRef(null);
 
             // Initialize audio context
@@ -53,7 +55,11 @@
                     });
                 };
                 document.addEventListener('click', unlockAudio);
-                return () => document.removeEventListener('click', unlockAudio);
+                document.addEventListener('touchstart', unlockAudio);
+                return () => {
+                    document.removeEventListener('click', unlockAudio);
+                    document.removeEventListener('touchstart', unlockAudio);
+                };
             }, []);
 
             // Initialize speech recognition
@@ -109,14 +115,35 @@
                     return;
                 }
 
-                console.log('Attempting manual audio playback:', lastAudioUrl);
+                console.log('Attempting manual audio playback:', lastAudioUrl.slice(0, 50) + '...');
                 audioRef.current.src = lastAudioUrl;
                 audioRef.current.play().then(() => {
-                    console.log('Manual audio playback started');
+                    console.log('Manual audio playback started (mpeg)');
                 }).catch(e => {
-                    console.error('Manual audio play error:', e);
-                    setError('Failed to play audio: ' + e.message);
+                    console.error('Manual audio play error (mpeg):', e);
+                    const mp3Url = lastAudioUrl.replace('audio/mpeg', 'audio/mp3');
+                    audioRef.current.src = mp3Url;
+                    audioRef.current.play().then(() => {
+                        console.log('Manual audio playback started (mp3)');
+                    }).catch(e => {
+                        console.error('Manual audio play error (mp3):', e);
+                        setError('Failed to play audio: ' + e.message);
+                        fallbackAudioRef.current.style.display = 'block';
+                        fallbackAudioRef.current.src = lastAudioUrl;
+                    });
                 });
+            };
+
+            const downloadAudio = () => {
+                if (lastAudioUrl) {
+                    console.log('Download audio clicked');
+                    const link = document.createElement('a');
+                    link.href = lastAudioUrl;
+                    link.download = 'amaia_response.mp3';
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                }
             };
 
             const handleUserSpeech = async (transcript) => {
@@ -182,13 +209,22 @@
                         if (data.audioUrl) {
                             setLastAudioUrl(data.audioUrl);
                             if (!muted && audioAllowed) {
-                                console.log('Attempting to auto-play audio:', data.audioUrl);
+                                console.log('Attempting to auto-play audio:', data.audioUrl.slice(0, 50) + '...');
                                 audioRef.current.src = data.audioUrl;
                                 audioRef.current.play().then(() => {
-                                    console.log('Auto-play started');
+                                    console.log('Auto-play started (mpeg)');
                                 }).catch(e => {
-                                    console.error('Auto audio play error:', e);
-                                    setError('Auto-play failed. Click "Play Audio" to hear Amaia.');
+                                    console.error('Auto audio play error (mpeg):', e);
+                                    const mp3Url = data.audioUrl.replace('audio/mpeg', 'audio/mp3');
+                                    audioRef.current.src = mp3Url;
+                                    audioRef.current.play().then(() => {
+                                        console.log('Auto-play started (mp3)');
+                                    }).catch(e => {
+                                        console.error('Auto audio play error (mp3):', e);
+                                        setError('Auto-play failed. Click "Play Audio" or use fallback player.');
+                                        fallbackAudioRef.current.style.display = 'block';
+                                        fallbackAudioRef.current.src = data.audioUrl;
+                                    });
                                 });
                             }
                         }
@@ -379,6 +415,23 @@
                                     }}
                                 >
                                     ▶️ Play Audio
+                                </button>
+                                <button
+                                    onClick={downloadAudio}
+                                    disabled={!lastAudioUrl}
+                                    style={{
+                                        padding: '16px 32px',
+                                        background: lastAudioUrl ? '#0284c7' : '#4b5563',
+                                        color: '#fff',
+                                        border: 'none',
+                                        borderRadius: '9999px',
+                                        fontWeight: '600',
+                                        cursor: lastAudioUrl ? 'pointer' : 'not-allowed',
+                                        fontSize: '14px',
+                                        boxShadow: lastAudioUrl ? '0 0 20px rgba(2, 132, 199, 0.5)' : 'none'
+                                    }}
+                                >
+                                    ⬇️ Download Audio
                                 </button>
                             </div>
                         </div>
