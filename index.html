@@ -36,6 +36,25 @@
             const [lastAudioUrl, setLastAudioUrl] = useState(null);
             const recognitionRef = useRef(null);
             const audioRef = useRef(document.getElementById('audio-player'));
+            const audioContextRef = useRef(null);
+
+            // Initialize audio context
+            useEffect(() => {
+                const unlockAudio = () => {
+                    if (!audioContextRef.current) {
+                        audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)();
+                    }
+                    audioContextRef.current.resume().then(() => {
+                        console.log('Audio context resumed');
+                        setAudioAllowed(true);
+                    }).catch(e => {
+                        console.error('Audio context resume error:', e);
+                        setError('Audio playback blocked. Click anywhere to enable audio.');
+                    });
+                };
+                document.addEventListener('click', unlockAudio);
+                return () => document.removeEventListener('click', unlockAudio);
+            }, []);
 
             // Initialize speech recognition
             useEffect(() => {
@@ -72,38 +91,32 @@
                 }
             }, []);
 
-            // Initialize audio context
-            useEffect(() => {
-                const unlockAudio = () => {
-                    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-                    ctx.resume().then(() => {
-                        console.log('Audio context resumed');
-                        setAudioAllowed(true);
-                    }).catch(e => {
-                        console.error('Audio context resume error:', e);
-                        setError('Please allow audio playback by clicking the page.');
-                    });
-                    document.removeEventListener('click', unlockAudio);
-                };
-                document.addEventListener('click', unlockAudio);
-                return () => document.removeEventListener('click', unlockAudio);
-            }, []);
-
             const playAudio = () => {
-                if (lastAudioUrl && audioAllowed && !muted) {
-                    console.log('Manually playing audio:', lastAudioUrl);
-                    audioRef.current.src = lastAudioUrl;
-                    audioRef.current.play().then(() => {
-                        console.log('Audio playback started');
-                    }).catch(e => {
-                        console.error('Manual audio play error:', e);
-                        setError('Failed to play audio. Ensure audio is allowed in browser settings.');
-                    });
-                } else if (!audioAllowed) {
+                console.log('Play Audio button clicked');
+                if (!audioAllowed) {
+                    console.log('Audio context not allowed yet');
                     setError('Audio playback blocked. Click anywhere to enable audio.');
-                } else if (!lastAudioUrl) {
-                    setError('No audio available to play.');
+                    return;
                 }
+                if (!lastAudioUrl) {
+                    console.log('No audio URL available');
+                    setError('No audio available to play.');
+                    return;
+                }
+                if (muted) {
+                    console.log('Audio muted');
+                    setError('Audio is muted. Unmute to play.');
+                    return;
+                }
+
+                console.log('Attempting manual audio playback:', lastAudioUrl);
+                audioRef.current.src = lastAudioUrl;
+                audioRef.current.play().then(() => {
+                    console.log('Manual audio playback started');
+                }).catch(e => {
+                    console.error('Manual audio play error:', e);
+                    setError('Failed to play audio: ' + e.message);
+                });
             };
 
             const handleUserSpeech = async (transcript) => {
@@ -169,7 +182,7 @@
                         if (data.audioUrl) {
                             setLastAudioUrl(data.audioUrl);
                             if (!muted && audioAllowed) {
-                                console.log('Attempting to play audio:', data.audioUrl);
+                                console.log('Attempting to auto-play audio:', data.audioUrl);
                                 audioRef.current.src = data.audioUrl;
                                 audioRef.current.play().then(() => {
                                     console.log('Auto-play started');
@@ -348,7 +361,10 @@
                                     {isRecording ? '🎙️' : '🎤'}
                                 </button>
                                 <button
-                                    onClick={playAudio}
+                                    onClick={() => {
+                                        console.log('Play Audio button clicked (wrapper)');
+                                        playAudio();
+                                    }}
                                     disabled={!lastAudioUrl || isThinking}
                                     style={{
                                         padding: '16px 32px',
