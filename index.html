@@ -41,7 +41,7 @@
             const reconnectAttempts = useRef(0);
             const maxReconnectAttempts = 3;
             const responseBuffer = useRef('');
-            const lastResponse = useRef(''); // Track last added response to prevent duplicates
+            const lastResponse = useRef('');
 
             // Unlock audio context and test audio playback
             useEffect(() => {
@@ -49,7 +49,6 @@
                     audioContext.current.resume().then(() => {
                         console.log('Audio context unlocked');
                         setAudioAllowed(true);
-                        // Test audio context with a short tone
                         const testSound = audioContext.current.createOscillator();
                         testSound.type = 'sine';
                         testSound.frequency.setValueAtTime(440, audioContext.current.currentTime);
@@ -106,7 +105,7 @@
             const addToTranscript = (speaker, text) => {
                 if (text && text.trim()) {
                     setCallTranscript(prev => [...prev, { speaker, text, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }]);
-                    if (speaker === 'Amaia') lastResponse.current = text; // Update last response
+                    if (speaker === 'Amaia') lastResponse.current = text;
                 }
             };
 
@@ -137,6 +136,25 @@
                     console.log('Fallback audio URL:', url);
                     playAudioQueue();
                 }
+            };
+
+            const testAudioPlayback = () => {
+                console.log('Testing audio playback with sample PCM');
+                const sampleRate = 16000;
+                const duration = 1; // 1 second
+                const audioBuffer = audioContext.current.createBuffer(1, sampleRate * duration, sampleRate);
+                const data = audioBuffer.getChannelData(0);
+                for (let i = 0; i < data.length; i++) {
+                    data[i] = Math.sin(2 * Math.PI * 440 * i / sampleRate) * 0.5; // 440Hz sine wave
+                }
+                const source = audioContext.current.createBufferSource();
+                source.buffer = audioBuffer;
+                source.connect(audioContext.current.destination);
+                source.start();
+                console.log('Sample PCM audio playback started');
+                source.onended = () => {
+                    console.log('Sample PCM audio playback ended');
+                };
             };
 
             const getSignedUrl = async () => {
@@ -188,7 +206,6 @@
                     reconnectAttempts.current = 0;
                     websocketRef.current.send(JSON.stringify({ type: 'conversation_initiation_client_data' }));
                     startMicrophone();
-                    // Start ping
                     pingIntervalRef.current = setInterval(() => {
                         if (websocketRef.current && websocketRef.current.readyState === WebSocket.OPEN) {
                             console.log('Sending ping');
@@ -199,12 +216,12 @@
 
                 websocketRef.current.onmessage = (event) => {
                     console.log('Received message, type:', typeof event.data);
+                    console.log('Raw message content:', event.data);
                     if (typeof event.data === 'string') {
                         try {
                             const data = JSON.parse(event.data);
-                            console.log('Received text:', JSON.stringify(data, null, 2));
+                            console.log('Parsed message:', JSON.stringify(data, null, 2));
                             if (data.type === 'agent_response' && data.agent_response_event?.agent_response) {
-                                // Only add if different from last response
                                 if (data.agent_response_event.agent_response !== lastResponse.current) {
                                     addToTranscript('Amaia', data.agent_response_event.agent_response);
                                 }
@@ -236,9 +253,9 @@
                                 } catch (err) {
                                     console.error('Audio processing error:', err.message);
                                     setError('Failed to process audio response');
-                                    // Save base64 for manual inspection
                                     const blob = new Blob([atob(data.audio_event.audio_base_64)], { type: 'audio/wav' });
                                     setFallbackAudioUrl(URL.createObjectURL(blob));
+                                    console.log('Fallback audio URL created for manual playback');
                                 }
                             } else if (data.type === 'error') {
                                 console.error('Server error:', data.error);
@@ -416,6 +433,10 @@
                                 <p style={{ color: '#9ca3af', fontSize: '14px' }}>{status}</p>
                                 {error && <p style={{ color: '#dc2626', fontSize: '14px', fontWeight: 500 }}>{error}</p>}
                             </div>
+
+                            <button onClick={testAudioPlayback} style={{ padding: '12px 24px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '9999px', fontWeight: '600', cursor: 'pointer', fontSize: '14px' }}>
+                                Test Audio Playback
+                            </button>
 
                             {fallbackAudioUrl && (
                                 <div style={{ marginTop: '16px' }}>
