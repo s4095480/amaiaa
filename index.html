@@ -38,12 +38,7 @@
             const recognitionRef = useRef(null);
             const pingIntervalRef = useRef(null);
             const reconnectAttempts = useRef(0);
-            const maxReconnectAttempts = 5;
-            const initialAudioSent = useRef(false);
-            const initialAudioReceived = useRef(false);
-
-            // Embedded Opus audio (short "hello" in WebM/Opus format, base64-encoded)
-            const helloAudioBase64 = 'UklGRuAAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA';
+            const maxReconnectAttempts = 3;
 
             // Unlock audio context
             useEffect(() => {
@@ -99,6 +94,7 @@
 
             const addToTranscript = (speaker, text) => {
                 if (text && text.trim()) {
+                    console.log('Adding to transcript:', speaker, text);
                     setCallTranscript(prev => [...prev, { speaker, text, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }]);
                 }
             };
@@ -152,63 +148,26 @@
                 debugLink.click();
                 console.log('Saved audio chunk as agent_response_[timestamp].ogg');
 
-                // Try direct Opus playback
                 try {
-                    console.log('Attempting direct Opus playback...');
-                    const audio = new Audio(debugUrl);
-                    audio.play().then(() => {
-                        console.log('Direct Opus playback started');
-                        audio.onended = () => {
-                            console.log('Direct Opus playback ended');
-                            isPlaying.current = false;
-                            playAudioQueue();
-                        };
-                    }).catch(err => {
-                        console.error('Direct Opus playback error:', err.message);
-                        throw err; // Fallback to PCM
-                    });
+                    const wavBuffer = createWavBuffer(chunk);
+                    console.log('Decoding WAV audio...');
+                    const buffer = await audioContext.current.decodeAudioData(wavBuffer);
+                    const source = audioContext.current.createBufferSource();
+                    source.buffer = buffer;
+                    source.connect(audioContext.current.destination);
+                    source.start();
+                    console.log('Audio playback started');
+                    source.onended = () => {
+                        console.log('Audio chunk ended');
+                        isPlaying.current = false;
+                        playAudioQueue();
+                    };
                 } catch (err) {
-                    // Try WAV playback
-                    try {
-                        console.log('Attempting WAV playback...');
-                        const wavBlob = new Blob([chunk], { type: 'audio/wav' });
-                        const wavUrl = URL.createObjectURL(wavBlob);
-                        const audio = new Audio(wavUrl);
-                        audio.play().then(() => {
-                            console.log('WAV playback started');
-                            audio.onended = () => {
-                                console.log('WAV playback ended');
-                                isPlaying.current = false;
-                                playAudioQueue();
-                            };
-                        }).catch(wavErr => {
-                            console.error('WAV playback error:', wavErr.message);
-                            throw wavErr; // Fallback to PCM
-                        });
-                    } catch (wavErr) {
-                        // Fallback to PCM decoding
-                        try {
-                            const wavBuffer = createWavBuffer(chunk);
-                            console.log('Decoding WAV audio...');
-                            const buffer = await audioContext.current.decodeAudioData(wavBuffer);
-                            const source = audioContext.current.createBufferSource();
-                            source.buffer = buffer;
-                            source.connect(audioContext.current.destination);
-                            source.start();
-                            console.log('PCM audio playback started');
-                            source.onended = () => {
-                                console.log('PCM audio chunk ended');
-                                isPlaying.current = false;
-                                playAudioQueue();
-                            };
-                        } catch (pcmErr) {
-                            console.error('PCM decode error:', pcmErr.message);
-                            isPlaying.current = false;
-                            setFallbackAudioUrl(debugUrl);
-                            console.log('Set fallback audio player with URL');
-                            playAudioQueue();
-                        }
-                    }
+                    console.error('Audio decode error:', err.message);
+                    isPlaying.current = false;
+                    setFallbackAudioUrl(debugUrl);
+                    console.log('Set fallback audio player with URL');
+                    playAudioQueue();
                 }
             };
 
@@ -237,8 +196,6 @@
                     time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                 }]);
                 reconnectAttempts.current = 0;
-                initialAudioSent.current = false;
-                initialAudioReceived.current = false;
                 connectWebSocket();
             };
 
@@ -255,28 +212,13 @@
                 console.log('Connecting to WebSocket:', signedUrl);
                 websocketRef.current = new WebSocket(signedUrl);
 
-                websocketRef.current.onopen = async () => {
+                websocketRef.current.onopen = () => {
                     console.log('WebSocket connected');
                     setIsConnected(true);
                     setStatus('Connected! Speak to Amaia.');
                     reconnectAttempts.current = 0;
                     websocketRef.current.send(JSON.stringify({ type: 'conversation_initiation_client_data' }));
-
-                    // Send initial hello audio
-                    if (!initialAudioSent.current) {
-                        try {
-                            const audioData = Uint8Array.from(atob(helloAudioBase64), c => c.charCodeAt(0));
-                            const audioBlob = new Blob([audioData], { type: 'audio/webm;codecs=opus' });
-                            console.log('Sending audio_start message');
-                            websocketRef.current.send(JSON.stringify({ type: 'audio_start', format: 'opus' }));
-                            websocketRef.current.send(audioBlob);
-                            console.log('Sent initial hello audio, size:', audioBlob.size, 'type:', audioBlob.type);
-                            initialAudioSent.current = true;
-                        } catch (err) {
-                            console.error('Failed to send initial hello audio:', err);
-                        }
-                    }
-
+                    startMicrophone();
                     // Start ping
                     pingIntervalRef.current = setInterval(() => {
                         if (websocketRef.current && websocketRef.current.readyState === WebSocket.OPEN) {
@@ -297,21 +239,10 @@
                             } else if (data.type === 'agent_chat_response_part' && data.text_response_part?.text) {
                                 addToTranscript('Amaia', data.text_response_part.text);
                             } else if (data.type === 'audio_event' && data.audio_event?.audio_base_64) {
-                                console.log('Processing audio_event, base64 length:', data.audio_event.audio_base_64.length);
-                                try {
-                                    const audioData = Uint8Array.from(atob(data.audio_event.audio_base_64), c => c.charCodeAt(0));
-                                    const audioBlob = new Blob([audioData], { type: 'audio/ogg' });
-                                    audioQueue.current.push(audioBlob);
-                                    console.log('Added audio blob to queue, size:', audioBlob.size);
-                                    if (!initialAudioReceived.current) {
-                                        initialAudioReceived.current = true;
-                                        startMicrophone();
-                                    }
-                                    playAudioQueue();
-                                } catch (err) {
-                                    console.error('Audio base64 decode error:', err.message);
-                                    setError('Failed to process audio data');
-                                }
+                                console.log('Received base64 audio, length:', data.audio_event.audio_base_64.length);
+                                const audioBytes = Uint8Array.from(atob(data.audio_event.audio_base_64), c => c.charCodeAt(0));
+                                audioQueue.current.push(audioBytes.buffer);
+                                playAudioQueue();
                             }
                         } catch (err) {
                             console.error('JSON parse error:', err.message);
@@ -354,9 +285,8 @@
                     }
                     if (isOnCall && reconnectAttempts.current < maxReconnectAttempts) {
                         reconnectAttempts.current += 1;
-                        const delay = Math.pow(2, reconnectAttempts.current) * 1000;
-                        console.log(`Reconnecting WebSocket, attempt ${reconnectAttempts.current}/${maxReconnectAttempts}, delay: ${delay}ms`);
-                        setTimeout(connectWebSocket, delay);
+                        console.log(`Reconnecting WebSocket, attempt ${reconnectAttempts.current}/${maxReconnectAttempts}`);
+                        setTimeout(connectWebSocket, 2000 * reconnectAttempts.current);
                     }
                 };
             };
@@ -371,10 +301,8 @@
                                 console.log('Skipping small audio chunk:', event.data.size, 'bytes');
                                 return;
                             }
-                            console.log('Sending audio chunk, size:', event.data.size, 'type:', event.data.type);
-                            websocketRef.current.send(JSON.stringify({ type: 'audio_start', format: 'opus' }));
+                            console.log('Sent audio chunk, size:', event.data.size, 'bytes');
                             websocketRef.current.send(event.data);
-                            console.log('Sent audio chunk, size:', event.data.size, 'type:', event.data.type);
                         } else {
                             console.log('Skipped audio chunk, size:', event.data.size, 'WebSocket state:', websocketRef.current?.readyState);
                         }
@@ -382,7 +310,7 @@
                     mediaRecorderRef.current.onstop = () => {
                         console.log('MediaRecorder stopped');
                     };
-                    mediaRecorderRef.current.start(500);
+                    mediaRecorderRef.current.start(250);
                     console.log('Microphone streaming started');
                     setStatus('Listening...');
                     if (recognitionRef.current) recognitionRef.current.start();
