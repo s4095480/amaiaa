@@ -325,4 +325,151 @@
                                 console.log('Skipping small audio chunk:', event.data.size, 'bytes');
                                 return;
                             }
-                            console.log('Sent audio chunk, size:', event.data.size, 'type
+                            console.log('Sent audio chunk, size:', event.data.size, 'type:', event.data.type);
+                            websocketRef.current.send(event.data);
+                        } else {
+                            console.log('Skipped audio chunk, size:', event.data.size, 'WebSocket state:', websocketRef.current?.readyState);
+                        }
+                    };
+                    mediaRecorderRef.current.onstop = () => {
+                        console.log('MediaRecorder stopped');
+                    };
+                    mediaRecorderRef.current.start(500);
+                    console.log('Microphone streaming started');
+                    setStatus('Listening...');
+                    if (recognitionRef.current) recognitionRef.current.start();
+                } catch (err) {
+                    console.error('Mic error:', err);
+                    setError('Microphone permission denied.');
+                }
+            };
+
+            const stopMicrophone = () => {
+                if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+                    mediaRecorderRef.current.stop();
+                    mediaRecorderRef.current = null;
+                }
+                if (recognitionRef.current) recognitionRef.current.stop();
+                console.log('Microphone stopped');
+            };
+
+            const endCall = () => {
+                if (websocketRef.current) websocketRef.current.close();
+                stopMicrophone();
+                setIsOnCall(false);
+                setCurrentPage('intro');
+                setCallTranscript([]);
+                setStatus('Amaia is online');
+                setError(null);
+                setFallbackAudioUrl(null);
+                if (pingIntervalRef.current) {
+                    clearInterval(pingIntervalRef.current);
+                    pingIntervalRef.current = null;
+                }
+            };
+
+            // INTRO PAGE
+            if (currentPage === 'intro') {
+                return (
+                    <div style={{ minHeight: '100vh', background: '#000', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden' }}>
+                        <div style={{ position: 'absolute', inset: 0, opacity: 0.2 }}>
+                            <div style={{ position: 'absolute', top: '80px', left: '40px', width: '384px', height: '384px', background: '#ec4899', borderRadius: '9999px', filter: 'blur(80px)' }} className="animate-pulse" />
+                            <div style={{ position: 'absolute', bottom: '80px', right: '40px', width: '320px', height: '320px', background: '#a855f7', borderRadius: '9999px', filter: 'blur(80px)', animationDelay: '1s' }} className="animate-pulse" />
+                        </div>
+
+                        <div style={{ position: 'relative', zIndex: 10, maxWidth: '448px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '32px', textAlign: 'center' }}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                                <div style={{ width: '96px', height: '96px', margin: '0 auto', borderRadius: '9999px', background: 'linear-gradient(135deg, #ec4899, #a855f7)', boxShadow: '0 0 50px rgba(236, 72, 153, 0.5)' }} className="animate-pulse" />
+                                <div>
+                                    <h1 style={{ fontSize: '48px', fontWeight: 300, letterSpacing: '0.1em', marginBottom: '8px' }}>Amaia</h1>
+                                    <p style={{ color: '#9ca3af', fontSize: '14px' }}>is calling...</p>
+                                </div>
+                            </div>
+
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                                <div style={{ width: '8px', height: '8px', background: '#4ade80', borderRadius: '9999px' }} className="animate-pulse" />
+                                <p style={{ fontSize: '12px', color: '#9ca3af' }}>live voice call</p>
+                            </div>
+
+                            <div style={{ display: 'flex', gap: '16px', justifyContent: 'center' }}>
+                                <button onClick={startCall} style={{ padding: '16px 48px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '9999px', fontWeight: '600', cursor: 'pointer', fontSize: '16px', boxShadow: '0 0 20px rgba(22, 163, 74, 0.5)' }}>
+                                    📞 Answer
+                                </button>
+                            </div>
+
+                            <p style={{ fontSize: '12px', color: '#4b5563', marginTop: '32px' }}>
+                                Welcome to Amaia's world. Real voice conversation powered by ElevenLabs agent.
+                            </p>
+                            {error && <p style={{ color: '#dc2626', fontSize: '14px', fontWeight: 500 }}>{error}</p>}
+                        </div>
+                    </div>
+                );
+            }
+
+            // CALL PAGE
+            if (currentPage === 'call') {
+                return (
+                    <div style={{ minHeight: '100vh', background: 'linear-gradient(to bottom, #030712, #000)', color: '#fff', display: 'flex', flexDirection: 'column' }}>
+                        <div style={{ position: 'sticky', top: 0, zIndex: 40, background: 'rgba(0, 0, 0, 0.8)', backdropFilter: 'blur(12px)', borderBottom: '1px solid #1f2937' }}>
+                            <div style={{ maxWidth: '1024px', margin: '0 auto', padding: '0 16px', height: '64px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <div style={{ textAlign: 'center', flex: 1 }}>
+                                    <h2 style={{ fontWeight: 600 }}>Amaia</h2>
+                                    <p style={{ fontSize: '12px', color: '#4ade80' }}>{isConnected ? 'on call' : 'connecting...'}</p>
+                                </div>
+                                <button onClick={endCall} style={{ background: '#dc2626', border: 'none', borderRadius: '9999px', padding: '12px', color: '#fff', cursor: 'pointer', fontSize: '20px' }}>
+                                    📞
+                                </button>
+                            </div>
+                        </div>
+
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 16px', gap: '48px' }}>
+                            <div style={{ position: 'relative' }}>
+                                <div style={{ width: '128px', height: '128px', borderRadius: '9999px', background: 'linear-gradient(135deg, #ec4899, #a855f7)', boxShadow: '0 0 50px rgba(236, 72, 153, 0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px' }} className={isConnected ? 'animate-pulse' : ''}>
+                                    🎤
+                                </div>
+                            </div>
+
+                            <div style={{ textAlign: 'center' }}>
+                                <p style={{ color: '#9ca3af', fontSize: '14px' }}>{status}</p>
+                                {error && <p style={{ color: '#dc2626', fontSize: '14px', fontWeight: 500 }}>{error}</p>}
+                            </div>
+
+                            {fallbackAudioUrl && (
+                                <div style={{ marginTop: '16px' }}>
+                                    <p style={{ color: '#f59e0b', fontSize: '14px' }}>Audio decode failed. Use fallback player:</p>
+                                    <audio controls src={fallbackAudioUrl}>
+                                        Your browser does not support the audio element.
+                                    </audio>
+                                </div>
+                            )}
+
+                            <div style={{ maxWidth: '448px', display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '200px', overflowY: 'auto' }}>
+                                {callTranscript.map((msg, i) => (
+                                    <div key={i} style={{ fontSize: '14px', color: msg.speaker === 'You' ? '#fda4af' : '#d1d5db' }}>
+                                        <p style={{ fontSize: '12px', color: '#4b5563', marginBottom: '4px' }}>{msg.speaker} ({msg.time})</p>
+                                        <p>{msg.text}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div style={{ background: 'rgba(0, 0, 0, 0.5)', borderTop: '1px solid #1f2937', padding: '24px 16px', maxHeight: '192px', overflowY: 'auto' }}>
+                            <p style={{ fontSize: '12px', color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '16px' }}>Call History</p>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                                {callTranscript.map((msg, i) => (
+                                    <div key={i} style={{ fontSize: '12px', color: msg.speaker === 'You' ? '#fda4af' : '#9ca3af' }}>
+                                        <p style={{ fontWeight: 600, marginBottom: '4px' }}>{msg.speaker} ({msg.time})</p>
+                                        <p>{msg.text}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                );
+            }
+        }
+
+        ReactDOM.render(<AmaiaPlatform />, document.getElementById('root'));
+    </script>
+</body>
+</html>
