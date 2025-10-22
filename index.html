@@ -40,14 +40,23 @@
             const pingIntervalRef = useRef(null);
             const reconnectAttempts = useRef(0);
             const maxReconnectAttempts = 3;
-            const responseBuffer = useRef(''); // Buffer for aggregating delta messages
+            const responseBuffer = useRef('');
+            const lastResponse = useRef(''); // Track last added response to prevent duplicates
 
-            // Unlock audio context
+            // Unlock audio context and test audio playback
             useEffect(() => {
                 const unlockAudio = () => {
                     audioContext.current.resume().then(() => {
                         console.log('Audio context unlocked');
                         setAudioAllowed(true);
+                        // Test audio context with a short tone
+                        const testSound = audioContext.current.createOscillator();
+                        testSound.type = 'sine';
+                        testSound.frequency.setValueAtTime(440, audioContext.current.currentTime);
+                        testSound.connect(audioContext.current.destination);
+                        testSound.start();
+                        testSound.stop(audioContext.current.currentTime + 0.5);
+                        console.log('Test tone played to verify audio context');
                     }).catch(e => {
                         console.error('Audio unlock error:', e);
                         setError('Audio permission blocked. Click to enable.');
@@ -97,6 +106,7 @@
             const addToTranscript = (speaker, text) => {
                 if (text && text.trim()) {
                     setCallTranscript(prev => [...prev, { speaker, text, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }]);
+                    if (speaker === 'Amaia') lastResponse.current = text; // Update last response
                 }
             };
 
@@ -153,6 +163,7 @@
                     text: "Hey, I'm so glad you called. Talk to me.",
                     time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                 }]);
+                lastResponse.current = "Hey, I'm so glad you called. Talk to me.";
                 reconnectAttempts.current = 0;
                 connectWebSocket();
             };
@@ -193,31 +204,29 @@
                             const data = JSON.parse(event.data);
                             console.log('Received text:', JSON.stringify(data, null, 2));
                             if (data.type === 'agent_response' && data.agent_response_event?.agent_response) {
-                                // Add complete response to transcript and clear buffer
-                                addToTranscript('Amaia', data.agent_response_event.agent_response);
-                                responseBuffer.current = '';
+                                // Only add if different from last response
+                                if (data.agent_response_event.agent_response !== lastResponse.current) {
+                                    addToTranscript('Amaia', data.agent_response_event.agent_response);
+                                }
                             } else if (data.type === 'agent_chat_response_part' && data.text_response_part) {
                                 if (data.text_response_part.type === 'start') {
-                                    responseBuffer.current = ''; // Reset buffer
+                                    responseBuffer.current = '';
                                 } else if (data.text_response_part.type === 'delta' && data.text_response_part.text) {
-                                    responseBuffer.current += data.text_response_part.text; // Append to buffer
+                                    responseBuffer.current += data.text_response_part.text;
                                 } else if (data.text_response_part.type === 'stop' && responseBuffer.current) {
-                                    addToTranscript('Amaia', responseBuffer.current); // Add buffered response
+                                    if (responseBuffer.current !== lastResponse.current) {
+                                        addToTranscript('Amaia', responseBuffer.current);
+                                    }
                                     responseBuffer.current = '';
                                 }
                             } else if (data.type === 'audio_event' && data.audio_event?.audio_base_64) {
                                 console.log('Received audio event, base64 length:', data.audio_event.audio_base_64.length);
                                 try {
                                     const audioBytes = Uint8Array.from(atob(data.audio_event.audio_base_64), c => c.charCodeAt(0));
-                                    const buffer = new ArrayBuffer(audioBytes.length);
-                                    const view = new Uint8Array(buffer);
-                                    for (let i = 0; i < audioBytes.length; i++) {
-                                        view[i] = audioBytes[i];
-                                    }
                                     const audioBuffer = audioContext.current.createBuffer(1, audioBytes.length / 2, 16000);
-                                    const floatArray = new Float32Array(audioBuffer.length);
+                                    const floatArray = new Float32Array(audioBytes.length / 2);
                                     for (let i = 0; i < audioBytes.length / 2; i++) {
-                                        const sample = (audioBytes[i * 2] | (audioBytes[i * 2 + 1] << 8)) / 32768;
+                                        const sample = ((audioBytes[i * 2] | (audioBytes[i * 2 + 1] << 8)) - 32768) / 32768;
                                         floatArray[i] = sample;
                                     }
                                     audioBuffer.getChannelData(0).set(floatArray);
@@ -227,6 +236,9 @@
                                 } catch (err) {
                                     console.error('Audio processing error:', err.message);
                                     setError('Failed to process audio response');
+                                    // Save base64 for manual inspection
+                                    const blob = new Blob([atob(data.audio_event.audio_base_64)], { type: 'audio/wav' });
+                                    setFallbackAudioUrl(URL.createObjectURL(blob));
                                 }
                             } else if (data.type === 'error') {
                                 console.error('Server error:', data.error);
@@ -336,6 +348,7 @@
                     pingIntervalRef.current = null;
                 }
                 responseBuffer.current = '';
+                lastResponse.current = '';
             };
 
             // INTRO PAGE
