@@ -40,6 +40,7 @@
             const pingIntervalRef = useRef(null);
             const reconnectAttempts = useRef(0);
             const maxReconnectAttempts = 3;
+            const responseBuffer = useRef(''); // Buffer for aggregating delta messages
 
             // Unlock audio context
             useEffect(() => {
@@ -120,7 +121,7 @@
                 } catch (err) {
                     console.error('Audio decode error:', err.message);
                     isPlaying.current = false;
-                    const blob = new Blob([chunk], { type: 'audio/mpeg' });
+                    const blob = new Blob([chunk], { type: 'audio/wav' });
                     const url = URL.createObjectURL(blob);
                     setFallbackAudioUrl(url);
                     console.log('Fallback audio URL:', url);
@@ -192,22 +193,46 @@
                             const data = JSON.parse(event.data);
                             console.log('Received text:', JSON.stringify(data, null, 2));
                             if (data.type === 'agent_response' && data.agent_response_event?.agent_response) {
+                                // Add complete response to transcript and clear buffer
                                 addToTranscript('Amaia', data.agent_response_event.agent_response);
-                            } else if (data.type === 'agent_chat_response_part' && data.text_response_part?.text) {
-                                addToTranscript('Amaia', data.text_response_part.text);
-                            } else if (data.type === 'audio_event' && data.audio_event?.audio_base_64) {
-                                console.log('Received base64 audio, length:', data.audio_event.audio_base_64.length);
-                                const audioBytes = Uint8Array.from(atob(data.audio_event.audio_base_64), c => c.charCodeAt(0));
-                                const buffer = new ArrayBuffer(audioBytes.length * 2);
-                                const view = new DataView(buffer);
-                                for (let i = 0; i < audioBytes.length; i++) {
-                                    view.setInt16(i * 2, audioBytes[i] << 8, true);
+                                responseBuffer.current = '';
+                            } else if (data.type === 'agent_chat_response_part' && data.text_response_part) {
+                                if (data.text_response_part.type === 'start') {
+                                    responseBuffer.current = ''; // Reset buffer
+                                } else if (data.text_response_part.type === 'delta' && data.text_response_part.text) {
+                                    responseBuffer.current += data.text_response_part.text; // Append to buffer
+                                } else if (data.text_response_part.type === 'stop' && responseBuffer.current) {
+                                    addToTranscript('Amaia', responseBuffer.current); // Add buffered response
+                                    responseBuffer.current = '';
                                 }
-                                audioQueue.current.push(buffer);
-                                playAudioQueue();
+                            } else if (data.type === 'audio_event' && data.audio_event?.audio_base_64) {
+                                console.log('Received audio event, base64 length:', data.audio_event.audio_base_64.length);
+                                try {
+                                    const audioBytes = Uint8Array.from(atob(data.audio_event.audio_base_64), c => c.charCodeAt(0));
+                                    const buffer = new ArrayBuffer(audioBytes.length);
+                                    const view = new Uint8Array(buffer);
+                                    for (let i = 0; i < audioBytes.length; i++) {
+                                        view[i] = audioBytes[i];
+                                    }
+                                    const audioBuffer = audioContext.current.createBuffer(1, audioBytes.length / 2, 16000);
+                                    const floatArray = new Float32Array(audioBuffer.length);
+                                    for (let i = 0; i < audioBytes.length / 2; i++) {
+                                        const sample = (audioBytes[i * 2] | (audioBytes[i * 2 + 1] << 8)) / 32768;
+                                        floatArray[i] = sample;
+                                    }
+                                    audioBuffer.getChannelData(0).set(floatArray);
+                                    audioQueue.current.push(audioBuffer.buffer);
+                                    console.log('Audio buffer queued, size:', audioBuffer.buffer.byteLength);
+                                    playAudioQueue();
+                                } catch (err) {
+                                    console.error('Audio processing error:', err.message);
+                                    setError('Failed to process audio response');
+                                }
                             } else if (data.type === 'error') {
                                 console.error('Server error:', data.error);
                                 setError(`Server error: ${data.error.message || 'Unknown error'}`);
+                            } else {
+                                console.log('Unhandled message type:', data.type);
                             }
                         } catch (err) {
                             console.error('JSON parse error:', err.message);
@@ -310,6 +335,7 @@
                     clearInterval(pingIntervalRef.current);
                     pingIntervalRef.current = null;
                 }
+                responseBuffer.current = '';
             };
 
             // INTRO PAGE
