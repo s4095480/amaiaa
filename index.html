@@ -423,13 +423,3 @@
 </body>
 </html>
 </xaiArtifact>
-
-### Step 2: Deploy Updates
-1. **Update Files**:
-   - **Keep `api/signed-url.js`**: No changes needed (200 status).
-   - **Update `index.html`**: Overwrite with the code above.
-   - Commit and push:
-     ```bash
-     git add index.html
-     git commit -m "Send base64 PCM audio in JSON, decode base64 PCM for playback"
-     git push
