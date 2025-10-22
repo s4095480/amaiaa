@@ -1,145 +1,88 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Amaia Voice Chat</title>
-  <style>
-    body {
-      background: #0e0e10;
-      color: #fff;
-      font-family: system-ui, sans-serif;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      height: 100vh;
-      margin: 0;
-    }
-
-    h1 {
-      font-size: 2rem;
-      margin-bottom: 1rem;
-      color: #e1b3ff;
-    }
-
-    #transcript {
-      width: 80%;
-      max-width: 600px;
-      height: 300px;
-      background: #1c1c1f;
-      border-radius: 10px;
-      overflow-y: auto;
-      padding: 1rem;
-      margin-bottom: 1rem;
-      box-shadow: 0 0 10px #5c3d91;
-    }
-
-    #transcript div {
-      margin-bottom: 0.5rem;
-      line-height: 1.5;
-    }
-
-    .buttons {
-      display: flex;
-      gap: 1rem;
-    }
-
-    button {
-      background: #5c3d91;
-      color: white;
-      border: none;
-      padding: 0.75rem 1.5rem;
-      border-radius: 8px;
-      font-size: 1rem;
-      cursor: pointer;
-      transition: background 0.2s ease;
-    }
-
-    button:hover {
-      background: #7b4fc3;
-    }
-
-    button:disabled {
-      background: #333;
-      cursor: not-allowed;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Amaia - AI Voice Chat</title>
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎤</text></svg>">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #000; color: #fff; }
+        .animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    </style>
 </head>
 <body>
-  <h1>🎧 Talk with Amaia</h1>
-  <div id="transcript">
-    <div><em>Amaia:</em> Hi there — I’m ready whenever you are.</div>
-  </div>
-  <div class="buttons">
-    <button id="startBtn">Start Talking</button>
-    <button id="stopBtn">Stop</button>
-  </div>
+    <div id="root"></div>
 
-  <script>
-    let websocketRef = { current: null };
-    let audioContextRef = { current: null };
-    let mediaStreamRef = { current: null };
-    let isRecordingRef = { current: false };
-    let isPlayingRef = { current: false };
-    let audioQueueRef = { current: [] };
+    <script>
+let websocketRef = { current: null };
+let audioContextRef = { current: null };
+let mediaStreamRef = { current: null };
+let isRecordingRef = { current: false };
+let isPlayingRef = { current: false };
+let audioQueueRef = { current: [] };
 
-    const addToTranscript = (speaker, text) => {
-      const transcriptDiv = document.getElementById('transcript');
-      const entry = document.createElement('div');
-      entry.textContent = `${speaker}: ${text}`;
-      transcriptDiv.appendChild(entry);
-      transcriptDiv.scrollTop = transcriptDiv.scrollHeight;
-    };
+const addToTranscript = (speaker, text) => {
+    const transcriptDiv = document.getElementById('transcript');
+    const entry = document.createElement('div');
+    entry.textContent = `${speaker}: ${text}`;
+    transcriptDiv.appendChild(entry);
+    transcriptDiv.scrollTop = transcriptDiv.scrollHeight;
+};
 
-    const connectWebSocket = async () => {
-      try {
+const connectWebSocket = async () => {
+    try {
         const response = await fetch('http://localhost:3000/session');
         const data = await response.json();
         websocketRef.current = new WebSocket(data.ws_url);
 
         websocketRef.current.onopen = () => {
-          console.log('✅ Connected to Amaia session');
+            console.log('✅ Connected to Amaia session');
         };
 
         websocketRef.current.onmessage = async (event) => {
-          const data = JSON.parse(event.data);
+            const data = JSON.parse(event.data);
 
-          // 🎤 USER SPEECH
-          if (data.type === 'user_transcript' && data.user_transcript_event?.transcript) {
-            addToTranscript('You', data.user_transcript_event.transcript);
-          }
+            // 🎤 USER SPEECH (your side)
+            if (data.type === 'user_transcript' && data.user_transcript_event?.transcript) {
+                addToTranscript('You', data.user_transcript_event.transcript);
+            }
 
-          // 🤖 AMAIA SPEECH (TEXT)
-          if (data.type === 'agent_response' && data.agent_response_event?.agent_response) {
-            addToTranscript('Amaia', data.agent_response_event.agent_response);
-          }
+            // 🤖 AMAIA SPEECH (text output)
+            if (data.type === 'agent_response' && data.agent_response_event?.agent_response) {
+                addToTranscript('Amaia', data.agent_response_event.agent_response);
+            }
 
-          // 🔊 AMAIA AUDIO
-          if (data.type === 'audio' && data.audio_event?.audio_chunk) {
-            const base64Audio = data.audio_event.audio_chunk;
-            const audioBytes = Uint8Array.from(atob(base64Audio), c => c.charCodeAt(0));
-            const audioBuffer = audioBytes.buffer;
-            audioQueueRef.current.push(audioBuffer);
-            playNextAudio();
-          }
+            // 🔊 AMAIA AUDIO (voice output)
+            if (data.type === 'audio' && data.audio_event?.audio_chunk) {
+                const base64Audio = data.audio_event.audio_chunk;
+                const audioBytes = Uint8Array.from(atob(base64Audio), c => c.charCodeAt(0));
+                const audioBuffer = audioBytes.buffer;
+                audioQueueRef.current.push(audioBuffer);
+                playNextAudio();
+            }
         };
 
         websocketRef.current.onclose = () => {
-          console.log('❌ WebSocket closed, retrying in 3 seconds...');
-          setTimeout(connectWebSocket, 3000);
+            console.log('❌ WebSocket closed, retrying in 3 seconds...');
+            setTimeout(connectWebSocket, 3000);
         };
-      } catch (err) {
+
+    } catch (err) {
         console.error('❌ Failed to connect:', err);
         setTimeout(connectWebSocket, 3000);
-      }
-    };
+    }
+};
 
-    const startRecording = async () => {
-      if (isRecordingRef.current) return;
-      isRecordingRef.current = true;
+const startRecording = async () => {
+    if (isRecordingRef.current) return;
+    isRecordingRef.current = true;
 
-      try {
+    try {
         audioContextRef.current = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
         mediaStreamRef.current = stream;
@@ -151,40 +94,40 @@
         processor.connect(audioContextRef.current.destination);
 
         processor.onaudioprocess = (e) => {
-          if (!isRecordingRef.current) return;
-          const input = e.inputBuffer.getChannelData(0);
-          const pcm16 = new Int16Array(input.length);
-          for (let i = 0; i < input.length; i++) {
-            pcm16[i] = Math.max(-1, Math.min(1, input[i])) * 0x7fff;
-          }
+            if (!isRecordingRef.current) return;
+            const input = e.inputBuffer.getChannelData(0);
+            const pcm16 = new Int16Array(input.length);
+            for (let i = 0; i < input.length; i++) {
+                pcm16[i] = Math.max(-1, Math.min(1, input[i])) * 0x7fff;
+            }
 
-          if (websocketRef.current && websocketRef.current.readyState === WebSocket.OPEN) {
-            websocketRef.current.send(pcm16);
-          }
+            if (websocketRef.current && websocketRef.current.readyState === WebSocket.OPEN) {
+                websocketRef.current.send(pcm16);
+            }
         };
 
         console.log('🎙️ Recording started');
-      } catch (err) {
+    } catch (err) {
         console.error('❌ Microphone access error:', err);
-      }
-    };
+    }
+};
 
-    const stopRecording = () => {
-      isRecordingRef.current = false;
-      if (mediaStreamRef.current) {
+const stopRecording = () => {
+    isRecordingRef.current = false;
+    if (mediaStreamRef.current) {
         mediaStreamRef.current.getTracks().forEach(track => track.stop());
         mediaStreamRef.current = null;
-      }
-      console.log('🛑 Recording stopped');
-    };
+    }
+    console.log('🛑 Recording stopped');
+};
 
-    const playNextAudio = async () => {
-      if (isPlayingRef.current || audioQueueRef.current.length === 0) return;
+const playNextAudio = async () => {
+    if (isPlayingRef.current || audioQueueRef.current.length === 0) return;
 
-      isPlayingRef.current = true;
-      const audioData = audioQueueRef.current.shift();
+    isPlayingRef.current = true;
+    const audioData = audioQueueRef.current.shift();
 
-      try {
+    try {
         const audioContext = audioContextRef.current;
         const audioBuffer = await audioContext.decodeAudioData(audioData.slice(0));
 
@@ -192,22 +135,24 @@
         source.buffer = audioBuffer;
         source.connect(audioContext.destination);
         source.onended = () => {
-          isPlayingRef.current = false;
-          playNextAudio();
+            isPlayingRef.current = false;
+            playNextAudio();
         };
         source.start(0);
         console.log('🔊 Playing Amaia’s response');
-      } catch (err) {
+    } catch (err) {
         console.error('❌ Audio decoding failed:', err);
         isPlayingRef.current = false;
         playNextAudio();
-      }
-    };
+    }
+};
 
-    connectWebSocket();
+// Initialize
+connectWebSocket();
 
-    document.getElementById('startBtn').addEventListener('click', startRecording);
-    document.getElementById('stopBtn').addEventListener('click', stopRecording);
-  </script>
+document.getElementById('startBtn').addEventListener('click', startRecording);
+document.getElementById('stopBtn').addEventListener('click', stopRecording);
+</script>
+
 </body>
 </html>
