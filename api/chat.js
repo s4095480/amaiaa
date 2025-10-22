@@ -20,7 +20,7 @@ module.exports = async (req, res) => {
   try {
     const { message } = req.body;
     const API_KEY = process.env.ELEVENLABS_API_KEY;
-    const VOICE_ID = 'MvVkLH9bosldCRpQiTw1'; // Your voice ID
+    const VOICE_ID = 'MvVkLH9bosldCRpQiTw1';
 
     console.log('Received message:', message);
     console.log('API Key exists:', !!API_KEY);
@@ -32,38 +32,40 @@ module.exports = async (req, res) => {
       return;
     }
 
-    // Generate TTS response with concise text (~20 chars, ~10-20 credits)
     console.log('Fetching TTS from ElevenLabs...');
     const ttsResponse = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}`, {
       method: 'POST',
       headers: {
         'xi-api-key': API_KEY,
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Accept': 'audio/mpeg'
       },
       body: JSON.stringify({
-        text: `You said "${message}". Talk more?`, // Short but natural
+        text: `You said "${message}". Talk more?`,
         model_id: 'eleven_monolingual_v1',
         voice_settings: { stability: 0.5, similarity_boost: 0.75 }
       })
     });
 
     console.log('TTS response status:', ttsResponse.status);
-    const ttsResponseText = await ttsResponse.text();
-    console.log('TTS response body:', ttsResponseText.slice(0, 100)); // Log first 100 chars
-
-    let audioBase64 = null;
-    let replyText = `I heard you say "${message}". Let's keep chatting!`;
-
-    if (ttsResponse.ok) {
-      audioBase64 = Buffer.from(ttsResponseText, 'binary').toString('base64');
-    } else {
-      console.error('TTS error details:', ttsResponseText);
-      replyText = 'Oops, I had trouble generating audio. Let’s keep talking though!';
+    if (!ttsResponse.ok) {
+      const errorText = await ttsResponse.text();
+      console.error('TTS error details:', errorText);
+      throw new Error(`TTS request failed: ${ttsResponse.status} - ${errorText}`);
     }
+
+    const audioBuffer = await ttsResponse.arrayBuffer();
+    const audioData = Buffer.from(audioBuffer);
+    console.log('Raw MP3 first 10 bytes:', audioData.slice(0, 10).toString('hex')); // Debug MP3 header
+    const audioBase64 = audioData.toString('base64');
+    console.log('Audio base64 length:', audioBase64.length);
+    console.log('Audio base64 starts with:', audioBase64.slice(0, 20));
+
+    const replyText = `I heard you say "${message}". Let's keep chatting!`;
 
     res.status(200).json({
       reply: replyText,
-      audioUrl: audioBase64 ? `data:audio/mpeg;base64,${audioBase64}` : null
+      audioUrl: `data:audio/mpeg;base64,${audioBase64}`
     });
   } catch (error) {
     console.error('Handler error:', error.message, error.stack);
