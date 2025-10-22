@@ -20,7 +20,7 @@
     <div id="root"></div>
 
     <script type="text/babel">
-        const { useState, useRef } = React;
+        const { useState, useRef, useEffect } = React;
 
         function AmaiaPlatform() {
             const [currentPage, setCurrentPage] = useState('intro');
@@ -30,10 +30,12 @@
             const [muted, setMuted] = useState(false);
             const [callTranscript, setCallTranscript] = useState([]);
             const [error, setError] = useState(null);
+            const [audioAllowed, setAudioAllowed] = useState(false);
             const recognitionRef = useRef(null);
+            const audioRef = useRef(null);
 
             // Initialize speech recognition
-            React.useEffect(() => {
+            useEffect(() => {
                 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
                 if (SpeechRecognition) {
                     recognitionRef.current = new SpeechRecognition();
@@ -41,8 +43,14 @@
                     recognitionRef.current.interimResults = false;
                     recognitionRef.current.lang = 'en-US';
 
-                    recognitionRef.current.onstart = () => setIsRecording(true);
-                    recognitionRef.current.onend = () => setIsRecording(false);
+                    recognitionRef.current.onstart = () => {
+                        console.log('Speech recognition started');
+                        setIsRecording(true);
+                    };
+                    recognitionRef.current.onend = () => {
+                        console.log('Speech recognition ended');
+                        setIsRecording(false);
+                    };
                     recognitionRef.current.onresult = (event) => {
                         for (let i = event.resultIndex; i < event.results.length; i++) {
                             if (event.results[i].isFinal) {
@@ -61,18 +69,41 @@
                 }
             }, []);
 
+            // Initialize audio context
+            useEffect(() => {
+                audioRef.current = new Audio();
+                // Attempt to unlock audio context with a user gesture
+                const unlockAudio = () => {
+                    const audio = new Audio();
+                    audio.play().then(() => {
+                        console.log('Audio context unlocked');
+                        setAudioAllowed(true);
+                    }).catch(e => {
+                        console.error('Audio unlock error:', e);
+                        setError('Please allow audio playback in your browser settings');
+                    });
+                    document.removeEventListener('click', unlockAudio);
+                };
+                document.addEventListener('click', unlockAudio);
+                return () => document.removeEventListener('click', unlockAudio);
+            }, []);
+
             const handleUserSpeech = async (transcript) => {
                 if (!transcript.trim()) return;
 
                 console.log('User speech transcribed:', transcript);
 
                 // Add user message
-                setCallTranscript(prev => [...prev, {
+                const userMessage = {
                     id: Date.now(),
                     sender: 'user',
                     text: transcript,
                     time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                }]);
+                };
+                setCallTranscript(prev => {
+                    console.log('Adding user transcript:', userMessage);
+                    return [...prev, userMessage];
+                });
 
                 setIsThinking(true);
                 setError(null);
@@ -107,20 +138,26 @@
                     }
 
                     if (data.reply) {
-                        setCallTranscript(prev => [...prev, {
+                        const amaiaMessage = {
                             id: Date.now() + 1,
                             sender: 'amaia',
                             text: data.reply,
                             time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                        }]);
+                        };
+                        setCallTranscript(prev => {
+                            console.log('Adding Amaia transcript:', amaiaMessage);
+                            return [...prev, amaiaMessage];
+                        });
 
-                        if (!muted && data.audioUrl) {
-                            console.log('Playing audio:', data.audioUrl);
-                            const audio = new Audio(data.audioUrl);
-                            audio.play().catch(e => {
+                        if (!muted && data.audioUrl && audioAllowed) {
+                            console.log('Attempting to play audio:', data.audioUrl);
+                            audioRef.current.src = data.audioUrl;
+                            audioRef.current.play().catch(e => {
                                 console.error('Audio play error:', e);
-                                setError('Failed to play audio');
+                                setError('Failed to play audio. Please allow audio in browser settings.');
                             });
+                        } else if (!audioAllowed) {
+                            setError('Audio playback is blocked. Click anywhere to enable audio.');
                         }
                     } else {
                         console.warn('No reply in response');
@@ -129,12 +166,16 @@
                 } catch (error) {
                     console.error('Chat error:', error);
                     setError(error.message);
-                    setCallTranscript(prev => [...prev, {
+                    const errorMessage = {
                         id: Date.now() + 1,
                         sender: 'amaia',
                         text: 'Sorry, I had trouble hearing that. Try again?',
                         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                    }]);
+                    };
+                    setCallTranscript(prev => {
+                        console.log('Adding error transcript:', errorMessage);
+                        return [...prev, errorMessage];
+                    });
                 } finally {
                     setIsThinking(false);
                 }
@@ -142,12 +183,14 @@
 
             const startListening = () => {
                 if (recognitionRef.current && !isRecording) {
+                    console.log('Starting speech recognition');
                     recognitionRef.current.start();
                 }
             };
 
             const stopListening = () => {
                 if (recognitionRef.current && isRecording) {
+                    console.log('Stopping speech recognition');
                     recognitionRef.current.stop();
                 }
             };
@@ -155,12 +198,14 @@
             const startCall = () => {
                 setIsOnCall(true);
                 setCurrentPage('call');
-                setCallTranscript([{
+                const welcomeMessage = {
                     id: 0,
                     sender: 'amaia',
                     text: "Hey, I'm so glad you called. Talk to me.",
                     time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                }]);
+                };
+                setCallTranscript([welcomeMessage]);
+                console.log('Call started, transcript initialized:', welcomeMessage);
             };
 
             const endCall = () => {
@@ -169,6 +214,7 @@
                 setCallTranscript([]);
                 stopListening();
                 setError(null);
+                console.log('Call ended');
             };
 
             // INTRO PAGE
@@ -203,6 +249,7 @@
                             <p style={{ fontSize: '12px', color: '#4b5563', marginTop: '32px' }}>
                                 Welcome to Amaia's world. Real voice conversation.
                             </p>
+                            {error && <p style={{ color: '#dc2626', fontSize: '14px', fontWeight: 500 }}>{error}</p>}
                         </div>
                     </div>
                 );
@@ -266,7 +313,7 @@
                                     display: 'flex',
                                     alignItems: 'center',
                                     justifyContent: 'center',
-                                    transform: 'scale(1)',
+                                    transform: isRecording ? 'scale(1.1)' : 'scale(1)',
                                     background: isRecording ? '#dc2626' : '#ec4899',
                                     border: 'none',
                                     color: '#fff',
