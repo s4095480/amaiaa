@@ -24,21 +24,29 @@
         function AmaiaPlatform() {
             const [currentPage, setCurrentPage] = useState('intro');
             const [isOnCall, setIsOnCall] = useState(false);
+            const [isConnected, setIsConnected] = useState(false);
             const [status, setStatus] = useState('Amaia is online');
             const [callTranscript, setCallTranscript] = useState([]);
             const [error, setError] = useState(null);
             const [audioAllowed, setAudioAllowed] = useState(false);
-            const [audioUrl, setAudioUrl] = useState(null);
+            const websocketRef = useRef(null);
+            const mediaRecorderRef = useRef(null);
             const audioContext = useRef(new (window.AudioContext || window.webkitAudioContext)());
+            const audioQueue = useRef([]);
+            const isPlaying = useRef(false);
             const recognitionRef = useRef(null);
+            const pingIntervalRef = useRef(null);
 
             // Unlock audio context
             useEffect(() => {
                 const unlockAudio = () => {
                     audioContext.current.resume().then(() => {
-                        console.log('Audio context resumed');
+                        console.log('Audio context unlocked');
                         setAudioAllowed(true);
-                    }).catch(e => console.error('Audio unlock error:', e));
+                    }).catch(e => {
+                        console.error('Audio unlock error:', e);
+                        setError('Audio permission blocked. Click to enable.');
+                    });
                 };
                 document.addEventListener('click', unlockAudio);
                 document.addEventListener('touchstart', unlockAudio);
@@ -48,12 +56,12 @@
                 };
             }, []);
 
-            // Speech recognition
+            // Local speech recognition for UI transcript
             useEffect(() => {
                 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
                 if (SpeechRecognition) {
                     recognitionRef.current = new SpeechRecognition();
-                    recognitionRef.current.continuous = false;
+                    recognitionRef.current.continuous = true;
                     recognitionRef.current.interimResults = true;
                     recognitionRef.current.lang = 'en-US';
 
@@ -65,126 +73,184 @@
                         console.log('Interim transcript:', transcript);
                         if (event.results[event.results.length - 1].isFinal) {
                             const finalTranscript = event.results[event.results.length - 1][0].transcript;
-                            console.log('User speech transcribed:', finalTranscript);
                             addToTranscript('You', finalTranscript);
-                            handleUserSpeech(finalTranscript);
                         }
                     };
                     recognitionRef.current.onerror = (event) => {
                         console.error('Speech error:', event.error);
-                        setError('Speech recognition error: ' + event.error);
-                        setStatus('Ready to listen');
+                        setError('Microphone error: ' + event.error);
                     };
                     recognitionRef.current.onend = () => {
                         console.log('Speech recognition ended');
-                        setStatus('Ready to listen');
+                        if (isOnCall && isConnected) recognitionRef.current.start(); // Restart for continuous listening
                     };
+                } else {
+                    setError('Speech recognition not supported.');
                 }
-            }, []);
+            }, [isOnCall, isConnected]);
 
-            const addToTranscript = (sender, text) => {
-                setCallTranscript(prev => [...prev, {
-                    id: Date.now(),
-                    sender,
-                    text,
-                    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                }]);
+            const addToTranscript = (speaker, text) => {
+                setCallTranscript(prev => [...prev, { speaker, text, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }]);
             };
 
-            const startCall = () => {
+            const playAudioQueue = async () => {
+                if (isPlaying.current || audioQueue.current.length === 0) return;
+                isPlaying.current = true;
+                const chunk = audioQueue.current.shift();
+                try {
+                    console.log('Decoding audio chunk...');
+                    const buffer = await audioContext.current.decodeAudioData(chunk);
+                    const source = audioContext.current.createBufferSource();
+                    source.buffer = buffer;
+                    source.connect(audioContext.current.destination);
+                    source.start();
+                    console.log('Audio playback started');
+                    source.onended = () => {
+                        console.log('Audio chunk ended');
+                        isPlaying.current = false;
+                        playAudioQueue();
+                    };
+                } catch (err) {
+                    console.error('Audio decode error:', err.message);
+                    isPlaying.current = false;
+                    playAudioQueue();
+                    // Debug: Save audio for testing
+                    const blob = new Blob([chunk], { type: 'audio/wav' });
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    link.download = 'agent_response.wav';
+                    link.click();
+                    URL.revokeObjectURL(url);
+                    console.log('Saved audio chunk as agent_response.wav for debugging');
+                }
+            };
+
+            const getSignedUrl = async () => {
+                try {
+                    console.log('Fetching signed URL...');
+                    const response = await fetch('/api/signed-url');
+                    if (!response.ok) throw new Error('Failed to get signed URL');
+                    const data = await response.json();
+                    console.log('Signed URL received:', data.signedUrl.slice(0, 50) + '...');
+                    return data.signedUrl;
+                } catch (error) {
+                    console.error('Signed URL error:', error);
+                    setError('Failed to connect to Amaia. Check console.');
+                    return null;
+                }
+            };
+
+            const startCall = async () => {
                 setIsOnCall(true);
                 setCurrentPage('call');
-                setStatus('Ready to listen');
+                setStatus('Connecting to Amaia...');
                 setCallTranscript([{
-                    id: 0,
-                    sender: 'Amaia',
+                    speaker: 'Amaia',
                     text: "Hey, I'm so glad you called. Talk to me.",
                     time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                 }]);
+
+                const signedUrl = await getSignedUrl();
+                if (!signedUrl) return;
+
+                console.log('Connecting to WebSocket:', signedUrl);
+                websocketRef.current = new WebSocket(signedUrl);
+
+                websocketRef.current.onopen = () => {
+                    console.log('WebSocket connected');
+                    setIsConnected(true);
+                    setStatus('Connected! Speak to Amaia.');
+                    startMicrophone();
+                    websocketRef.current.send(JSON.stringify({ type: 'conversation_initiation_client_data' }));
+                    // Start ping to keep WebSocket alive
+                    pingIntervalRef.current = setInterval(() => {
+                        if (websocketRef.current && websocketRef.current.readyState === WebSocket.OPEN) {
+                            console.log('Sending ping');
+                            websocketRef.current.send(JSON.stringify({ type: 'ping' }));
+                        }
+                    }, 30000); // Ping every 30 seconds
+                };
+
+                websocketRef.current.onmessage = (event) => {
+                    if (typeof event.data === 'string') {
+                        try {
+                            const data = JSON.parse(event.data);
+                            console.log('Received text:', data);
+                            if (data.type === 'agent_response' || data.type === 'agent_chat_response_part') {
+                                const text = data.agent_response || data.text_response_part?.text || 'Thinking...';
+                                if (text && text !== 'Thinking...') {
+                                    addToTranscript('Amaia', text);
+                                }
+                            }
+                        } catch (err) {
+                            console.log('Non-JSON message:', event.data);
+                        }
+                    } else if (event.data instanceof Blob) {
+                        event.data.arrayBuffer().then(buffer => {
+                            audioQueue.current.push(buffer);
+                            playAudioQueue();
+                        }).catch(err => console.error('Audio buffer error:', err));
+                    }
+                };
+
+                websocketRef.current.onerror = (err) => {
+                    console.error('WebSocket error:', err);
+                    setError('Connection error. Try again.');
+                };
+
+                websocketRef.current.onclose = () => {
+                    console.log('WebSocket closed');
+                    setIsConnected(false);
+                    setStatus('Disconnected');
+                    stopMicrophone();
+                    if (pingIntervalRef.current) {
+                        clearInterval(pingIntervalRef.current);
+                        pingIntervalRef.current = null;
+                    }
+                };
+            };
+
+            const startMicrophone = async () => {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    mediaRecorderRef.current = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' });
+                    mediaRecorderRef.current.ondataavailable = (event) => {
+                        if (event.data.size > 0 && websocketRef.current && websocketRef.current.readyState === WebSocket.OPEN) {
+                            websocketRef.current.send(event.data);
+                            console.log('Sent audio chunk:', event.data.size, 'bytes');
+                        }
+                    };
+                    mediaRecorderRef.current.start(250);
+                    console.log('Microphone streaming started');
+                    setStatus('Listening...');
+                    if (recognitionRef.current) recognitionRef.current.start();
+                } catch (err) {
+                    console.error('Mic error:', err);
+                    setError('Microphone permission denied.');
+                }
+            };
+
+            const stopMicrophone = () => {
+                if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+                    mediaRecorderRef.current.stop();
+                    mediaRecorderRef.current = null;
+                }
+                if (recognitionRef.current) recognitionRef.current.stop();
+                console.log('Microphone stopped');
             };
 
             const endCall = () => {
+                if (websocketRef.current) websocketRef.current.close();
+                stopMicrophone();
                 setIsOnCall(false);
                 setCurrentPage('intro');
                 setCallTranscript([]);
                 setStatus('Amaia is online');
                 setError(null);
-                setAudioUrl(null);
-                if (recognitionRef.current) recognitionRef.current.stop();
-            };
-
-            const handleUserSpeech = async (transcript) => {
-                setStatus('Processing...');
-                try {
-                    const response = await fetch('/api/chat', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ message: transcript })
-                    });
-                    console.log('Response status:', response.status);
-                    const data = await response.json();
-                    console.log('Raw response:', JSON.stringify(data));
-
-                    if (!response.ok) {
-                        throw new Error(`Backend error: ${response.status} - ${data.error || 'Unknown error'}`);
-                    }
-
-                    addToTranscript('Amaia', data.reply);
-                    setAudioUrl(data.audioUrl);
-                    setStatus('Ready to listen');
-
-                    // Auto-play audio
-                    try {
-                        console.log('Attempting to play audio:', data.audioUrl);
-                        const audio = new Audio(data.audioUrl);
-                        audio.play().then(() => {
-                            console.log('Audio playback started');
-                        }).catch(err => {
-                            console.error('Audio play error:', err);
-                            setError('Failed to play audio automatically. Use the Play Audio button.');
-                        });
-                    } catch (err) {
-                        console.error('Audio setup error:', err);
-                        setError('Failed to set up audio. Use the Play Audio button.');
-                    }
-                } catch (err) {
-                    console.error('Chat error:', err);
-                    setError(`Error: ${err.message}`);
-                    setStatus('Ready to listen');
-                    addToTranscript('Amaia', 'Sorry, I had trouble hearing that. Try again?');
-                }
-            };
-
-            const startListening = () => {
-                if (recognitionRef.current && audioAllowed) {
-                    console.log('Starting speech recognition');
-                    recognitionRef.current.start();
-                    setStatus('Listening...');
-                } else {
-                    setError('Audio not allowed or speech recognition unavailable.');
-                }
-            };
-
-            const playAudio = () => {
-                if (audioUrl) {
-                    console.log('Play Audio button clicked');
-                    const audio = new Audio(audioUrl);
-                    audio.play().then(() => {
-                        console.log('Manual audio playback started');
-                    }).catch(err => {
-                        console.error('Manual audio play error:', err);
-                        setError('Failed to play audio: ' + err.message);
-                    });
-                }
-            };
-
-            const downloadAudio = () => {
-                if (audioUrl) {
-                    console.log('Download audio clicked');
-                    const link = document.createElement('a');
-                    link.href = audioUrl;
-                    link.download = 'amaia_response.mp3';
-                    link.click();
+                if (pingIntervalRef.current) {
+                    clearInterval(pingIntervalRef.current);
+                    pingIntervalRef.current = null;
                 }
             };
 
@@ -218,7 +284,7 @@
                             </div>
 
                             <p style={{ fontSize: '12px', color: '#4b5563', marginTop: '32px' }}>
-                                Welcome to Amaia's world. Real voice conversation powered by ElevenLabs.
+                                Welcome to Amaia's world. Real voice conversation powered by ElevenLabs agent.
                             </p>
                             {error && <p style={{ color: '#dc2626', fontSize: '14px', fontWeight: 500 }}>{error}</p>}
                         </div>
@@ -234,7 +300,7 @@
                             <div style={{ maxWidth: '1024px', margin: '0 auto', padding: '0 16px', height: '64px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                 <div style={{ textAlign: 'center', flex: 1 }}>
                                     <h2 style={{ fontWeight: 600 }}>Amaia</h2>
-                                    <p style={{ fontSize: '12px', color: '#4ade80' }}>on call</p>
+                                    <p style={{ fontSize: '12px', color: '#4ade80' }}>{isConnected ? 'on call' : 'connecting...'}</p>
                                 </div>
                                 <button onClick={endCall} style={{ background: '#dc2626', border: 'none', borderRadius: '9999px', padding: '12px', color: '#fff', cursor: 'pointer', fontSize: '20px' }}>
                                     📞
@@ -244,7 +310,7 @@
 
                         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 16px', gap: '48px' }}>
                             <div style={{ position: 'relative' }}>
-                                <div style={{ width: '128px', height: '128px', borderRadius: '9999px', background: 'linear-gradient(135deg, #ec4899, #a855f7)', boxShadow: '0 0 50px rgba(236, 72, 153, 0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px' }} className="animate-pulse">
+                                <div style={{ width: '128px', height: '128px', borderRadius: '9999px', background: 'linear-gradient(135deg, #ec4899, #a855f7)', boxShadow: '0 0 50px rgba(236, 72, 153, 0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px' }} className={isConnected ? 'animate-pulse' : ''}>
                                     🎤
                                 </div>
                             </div>
@@ -254,35 +320,10 @@
                                 {error && <p style={{ color: '#dc2626', fontSize: '14px', fontWeight: 500 }}>{error}</p>}
                             </div>
 
-                            <div style={{ display: 'flex', gap: '16px' }}>
-                                <button onClick={startListening} style={{ padding: '16px 48px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '9999px', fontWeight: '600', cursor: 'pointer', fontSize: '16px', boxShadow: '0 0 20px rgba(22, 163, 74, 0.5)' }}>
-                                    🎤 Speak
-                                </button>
-                                {audioUrl && (
-                                    <>
-                                        <button onClick={playAudio} style={{ padding: '16px 48px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '9999px', fontWeight: '600', cursor: 'pointer', fontSize: '16px', boxShadow: '0 0 20px rgba(59, 130, 246, 0.5)' }}>
-                                            ▶️ Play Audio
-                                        </button>
-                                        <button onClick={downloadAudio} style={{ padding: '16px 48px', background: '#6b7280', color: '#fff', border: 'none', borderRadius: '9999px', fontWeight: '600', cursor: 'pointer', fontSize: '16px', boxShadow: '0 0 20px rgba(107, 114, 128, 0.5)' }}>
-                                            💾 Download Audio
-                                        </button>
-                                    </>
-                                )}
-                            </div>
-
-                            {audioUrl && (
-                                <div style={{ marginTop: '16px' }}>
-                                    <audio controls>
-                                        <source src={audioUrl} type="audio/mpeg" />
-                                        Your browser does not support the audio element.
-                                    </audio>
-                                </div>
-                            )}
-
                             <div style={{ maxWidth: '448px', display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '200px', overflowY: 'auto' }}>
                                 {callTranscript.map((msg, i) => (
-                                    <div key={msg.id} style={{ fontSize: '14px', color: msg.sender === 'You' ? '#fda4af' : '#d1d5db' }}>
-                                        <p style={{ fontSize: '12px', color: '#4b5563', marginBottom: '4px' }}>{msg.sender} ({msg.time})</p>
+                                    <div key={i} style={{ fontSize: '14px', color: msg.speaker === 'You' ? '#fda4af' : '#d1d5db' }}>
+                                        <p style={{ fontSize: '12px', color: '#4b5563', marginBottom: '4px' }}>{msg.speaker} ({msg.time})</p>
                                         <p>{msg.text}</p>
                                     </div>
                                 ))}
@@ -293,8 +334,8 @@
                             <p style={{ fontSize: '12px', color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '16px' }}>Call History</p>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                                 {callTranscript.map((msg, i) => (
-                                    <div key={msg.id} style={{ fontSize: '12px', color: msg.sender === 'You' ? '#fda4af' : '#9ca3af' }}>
-                                        <p style={{ fontWeight: 600, marginBottom: '4px' }}>{msg.sender} ({msg.time})</p>
+                                    <div key={i} style={{ fontSize: '12px', color: msg.speaker === 'You' ? '#fda4af' : '#9ca3af' }}>
+                                        <p style={{ fontWeight: 600, marginBottom: '4px' }}>{msg.speaker} ({msg.time})</p>
                                         <p>{msg.text}</p>
                                     </div>
                                 ))}
