@@ -54,13 +54,6 @@
                     ]).then(() => {
                         console.log('Audio contexts unlocked');
                         setAudioAllowed(true);
-                        const testSound = playbackContext.current.createOscillator();
-                        testSound.type = 'sine';
-                        testSound.frequency.setValueAtTime(440, playbackContext.current.currentTime);
-                        testSound.connect(playbackContext.current.destination);
-                        testSound.start();
-                        testSound.stop(playbackContext.current.currentTime + 0.5);
-                        console.log('Test tone played to verify audio context');
                     }).catch(e => {
                         console.error('Audio unlock error:', e);
                         setError('Audio permission blocked. Click to enable.');
@@ -114,6 +107,39 @@
                 }
             };
 
+            const createWavBlob = (pcmData) => {
+                const sampleRate = 16000;
+                const numChannels = 1;
+                const bitsPerSample = 16;
+                const byteRate = sampleRate * numChannels * bitsPerSample / 8;
+                const blockAlign = numChannels * bitsPerSample / 8;
+                const dataSize = pcmData.length;
+                const buffer = new ArrayBuffer(44 + dataSize);
+                const view = new DataView(buffer);
+
+                // WAV Header
+                view.setUint32(0, 0x52494646, false); // "RIFF"
+                view.setUint32(4, 36 + dataSize, true); // Chunk size
+                view.setUint32(8, 0x57415645, false); // "WAVE"
+                view.setUint32(12, 0x666d7420, false); // "fmt "
+                view.setUint32(16, 16, true); // Subchunk1Size (16 for PCM)
+                view.setUint16(20, 1, true); // AudioFormat (1 for PCM)
+                view.setUint16(22, numChannels, true); // NumChannels
+                view.setUint32(24, sampleRate, true); // SampleRate
+                view.setUint32(28, byteRate, true); // ByteRate
+                view.setUint16(32, blockAlign, true); // BlockAlign
+                view.setUint16(34, bitsPerSample, true); // BitsPerSample
+                view.setUint32(36, 0x64617461, false); // "data"
+                view.setUint32(40, dataSize, true); // Subchunk2Size
+
+                // PCM Data
+                for (let i = 0; i < pcmData.length; i++) {
+                    view.setUint8(44 + i, pcmData[i]);
+                }
+
+                return new Blob([view], { type: 'audio/wav' });
+            };
+
             const validatePcmData = (audioBytes) => {
                 if (audioBytes.length < 2 || audioBytes.length % 2 !== 0) {
                     console.error('PCM data invalid: length must be even, got', audioBytes.length);
@@ -131,8 +157,10 @@
                 }
                 const nonZeroRatio = nonZeroCount / Math.min(audioBytes.length, 100);
                 const outOfRangeRatio = outOfRange / Math.min(audioBytes.length, 100);
-                if (nonZeroRatio < 0.2 || outOfRangeRatio > 0.8) {
-                    console.error('PCM data invalid: nonZeroRatio=', nonZeroRatio, 'outOfRangeRatio=', outOfRangeRatio);
+                console.log('PCM validation: nonZeroRatio=', nonZeroRatio, 'outOfRangeRatio=', outOfRangeRatio);
+                // Relaxed validation for debugging
+                if (nonZeroRatio < 0.1) {
+                    console.error('PCM data likely invalid: nonZeroRatio too low', nonZeroRatio);
                     return false;
                 }
                 return true;
@@ -165,28 +193,26 @@
                 } catch (err) {
                     console.error('Audio decode error:', err.message);
                     isPlaying.current = false;
-                    setError('Failed to decode audio chunk. Check server audio format.');
-                    playAudioQueue();
+                    setError('Failed to decode audio chunk. Using fallback WAV.');
+                    // Fallback to HTML audio element
+                    const wavBlob = createWavBlob(new Uint8Array(chunk));
+                    const url = URL.createObjectURL(wavBlob);
+                    const audio = new Audio(url);
+                    audio.play().then(() => {
+                        console.log('Fallback WAV playback started');
+                        audio.onended = () => {
+                            console.log('Fallback WAV playback ended');
+                            URL.revokeObjectURL(url);
+                            isPlaying.current = false;
+                            playAudioQueue();
+                        };
+                    }).catch(e => {
+                        console.error('Fallback playback error:', e);
+                        setError('Failed to play audio. Check server audio format.');
+                        isPlaying.current = false;
+                        playAudioQueue();
+                    });
                 }
-            };
-
-            const testAudioPlayback = () => {
-                console.log('Testing audio playback with sample PCM');
-                const sampleRate = 16000;
-                const duration = 1;
-                const audioBuffer = playbackContext.current.createBuffer(1, sampleRate * duration, sampleRate);
-                const data = audioBuffer.getChannelData(0);
-                for (let i = 0; i < data.length; i++) {
-                    data[i] = Math.sin(2 * Math.PI * 440 * i / sampleRate) * 0.5;
-                }
-                const source = playbackContext.current.createBufferSource();
-                source.buffer = audioBuffer;
-                source.connect(playbackContext.current.destination);
-                source.start();
-                console.log('Sample PCM audio playback started');
-                source.onended = () => {
-                    console.log('Sample PCM audio playback ended');
-                };
             };
 
             const getSignedUrl = async () => {
@@ -280,26 +306,40 @@
                                     const audioBytes = Uint8Array.from(atob(data.audio_event.audio_base_64), c => c.charCodeAt(0));
                                     console.log('Audio bytes length:', audioBytes.length, 'First 10 bytes:', audioBytes.slice(0, 10));
                                     if (!validatePcmData(audioBytes)) {
-                                        console.error('Invalid PCM data detected');
-                                        setError('Invalid audio data received from server');
-                                        return;
+                                        console.warn('PCM data validation failed, attempting playback anyway');
+                                        // Log first 20 samples for debugging
+                                        const floatArray = new Float32Array(Math.floor(audioBytes.length / 2));
+                                        for (let i = 0; i < floatArray.length; i++) {
+                                            floatArray[i] = ((audioBytes[i * 2] | (audioBytes[i * 2 + 1] << 8)) - 32768) / 32768;
+                                        }
+                                        console.log('First 20 PCM samples:', floatArray.slice(0, 20));
                                     }
                                     const audioBuffer = playbackContext.current.createBuffer(1, audioBytes.length / 2, 16000);
                                     const floatArray = new Float32Array(audioBytes.length / 2);
                                     for (let i = 0; i < audioBytes.length / 2; i++) {
                                         const sample = ((audioBytes[i * 2] | (audioBytes[i * 2 + 1] << 8)) - 32768) / 32768;
-                                        if (isNaN(sample) || Math.abs(sample) > 1) {
-                                            console.error('Invalid PCM sample at index', i, 'value:', sample);
-                                            setError('Invalid audio sample values detected');
-                                            return;
-                                        }
-                                        floatArray[i] = sample;
+                                        floatArray[i] = isNaN(sample) || Math.abs(sample) > 1 ? 0 : sample;
                                     }
                                     audioBuffer.getChannelData(0).set(floatArray);
                                     const buffer = audioBuffer.buffer;
                                     if (!buffer || buffer.byteLength === 0) {
                                         console.error('Invalid audio buffer created');
-                                        setError('Failed to create audio buffer');
+                                        setError('Failed to create audio buffer, using fallback WAV');
+                                        const wavBlob = createWavBlob(audioBytes);
+                                        const url = URL.createObjectURL(wavBlob);
+                                        const audio = new Audio(url);
+                                        audio.play().then(() => {
+                                            console.log('Fallback WAV playback started');
+                                            audio.onended = () => {
+                                                console.log('Fallback WAV playback ended');
+                                                URL.revokeObjectURL(url);
+                                                isPlaying.current = false;
+                                                playAudioQueue();
+                                            };
+                                        }).catch(e => {
+                                            console.error('Fallback playback error:', e);
+                                            setError('Failed to play audio');
+                                        });
                                         return;
                                     }
                                     audioQueue.current.push(buffer);
@@ -307,11 +347,29 @@
                                     playAudioQueue();
                                 } catch (err) {
                                     console.error('Audio processing error:', err.message);
-                                    setError('Failed to process audio response');
+                                    setError('Failed to process audio, using fallback WAV');
+                                    const audioBytes = Uint8Array.from(atob(data.audio_event.audio_base_64), c => c.charCodeAt(0));
+                                    const wavBlob = createWavBlob(audioBytes);
+                                    const url = URL.createObjectURL(wavBlob);
+                                    const audio = new Audio(url);
+                                    audio.play().then(() => {
+                                        console.log('Fallback WAV playback started');
+                                        audio.onended = () => {
+                                            console.log('Fallback WAV playback ended');
+                                            URL.revokeObjectURL(url);
+                                            isPlaying.current = false;
+                                            playAudioQueue();
+                                        };
+                                    }).catch(e => {
+                                        console.error('Fallback playback error:', e);
+                                        setError('Failed to play audio');
+                                    });
                                 }
                             } else if (data.type === 'error') {
                                 console.error('Server error:', data.error);
                                 setError(`Server error: ${data.error.message || 'Unknown error'}`);
+                            } else if (data.type === 'user_transcription_event' && data.user_transcription_event?.user_transcript) {
+                                console.log('Server received user transcript:', data.user_transcription_event.user_transcript);
                             } else {
                                 console.log('Unhandled message type:', data.type);
                             }
@@ -354,7 +412,6 @@
                     const source = audioContext.current.createMediaStreamSource(stream);
                     scriptProcessorRef.current = audioContext.current.createScriptProcessor(4096, 1, 1);
                     source.connect(scriptProcessorRef.current);
-                    // Do not connect to destination to prevent feedback
                     scriptProcessorRef.current.onaudioprocess = (e) => {
                         if (websocketRef.current && websocketRef.current.readyState === WebSocket.OPEN) {
                             const input = e.inputBuffer.getChannelData(0);
@@ -365,10 +422,8 @@
                                 view.setInt16(i * 2, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
                             }
                             const base64 = arrayBufferToBase64(buffer);
-                            websocketRef.current.send(JSON.stringify({ user_audio_chunk: base64 }));
-                            console.log('Sent PCM audio chunk, size:', buffer.byteLength, 'bytes (base64 length:', base64.length, ')');
-                        } else {
-                            console.log('Skipped audio chunk, size:', e.inputBuffer.length * 2, 'WebSocket state:', websocketRef.current?.readyState);
+                            console.log('Sending user audio chunk, size:', buffer.byteLength);
+                            websocketRef.current.send(JSON.stringify({ type: 'user_audio_chunk', user_audio_chunk: base64 }));
                         }
                     };
                     console.log('Microphone streaming started (PCM 16000Hz)');
@@ -486,10 +541,6 @@
                                 <p style={{ color: '#9ca3af', fontSize: '14px' }}>{status}</p>
                                 {error && <p style={{ color: '#dc2626', fontSize: '14px', fontWeight: 500 }}>{error}</p>}
                             </div>
-
-                            <button onClick={testAudioPlayback} style={{ padding: '12px 24px', background: '#3b82f6', color: '#fff', border: 'none', borderRadius: '9999px', fontWeight: '600', cursor: 'pointer', fontSize: '14px' }}>
-                                Test Audio Playback
-                            </button>
 
                             <div style={{ maxWidth: '448px', display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '200px', overflowY: 'auto' }}>
                                 {callTranscript.map((msg, i) => (
