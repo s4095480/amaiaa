@@ -32,7 +32,7 @@
             const [fallbackAudioUrl, setFallbackAudioUrl] = useState(null);
             const websocketRef = useRef(null);
             const mediaRecorderRef = useRef(null);
-            const audioContext = useRef(new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 22050 }));
+            const audioContext = useRef(new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 }));
             const audioQueue = useRef([]);
             const isPlaying = useRef(false);
             const recognitionRef = useRef(null);
@@ -97,7 +97,7 @@
             };
 
             const createWavBuffer = (audioData) => {
-                const sampleRate = 22050;
+                const sampleRate = 16000;
                 const channels = 1;
                 const bitsPerSample = 16;
                 const byteRate = sampleRate * channels * (bitsPerSample / 8);
@@ -162,7 +162,7 @@
                 } catch (err) {
                     console.error('Audio decode error:', err.message);
                     isPlaying.current = false;
-                    setFallbackAudioUrl(debugUrl); // Use same URL for fallback
+                    setFallbackAudioUrl(debugUrl);
                     console.log('Set fallback audio player with URL');
                     playAudioQueue();
                 }
@@ -222,7 +222,7 @@
                             console.log('Sending ping');
                             websocketRef.current.send(JSON.stringify({ type: 'ping' }));
                         }
-                    }, 3000); // Ping every 3 seconds
+                    }, 3000);
                 };
 
                 websocketRef.current.onmessage = (event) => {
@@ -251,7 +251,6 @@
                         });
                     } else {
                         console.log('Received unknown data type:', typeof event.data);
-                        // Save for debugging
                         const debugBlob = new Blob([event.data], { type: 'application/octet-stream' });
                         const debugUrl = URL.createObjectURL(debugBlob);
                         const debugLink = document.createElement('a');
@@ -268,7 +267,7 @@
                 };
 
                 websocketRef.current.onclose = (event) => {
-                    console.log('WebSocket closed, code:', event.code, 'reason:', event.reason);
+                    console.log('WebSocket closed, code:', event.code, 'reason:', event.reason || 'No reason provided');
                     setIsConnected(false);
                     setStatus('Disconnected');
                     stopMicrophone();
@@ -303,15 +302,10 @@
                     mediaRecorderRef.current.onstop = () => {
                         console.log('MediaRecorder stopped');
                     };
-                    // Delay start to ensure stable stream
-                    setTimeout(() => {
-                        if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'inactive') {
-                            mediaRecorderRef.current.start(500);
-                            console.log('Microphone streaming started');
-                            setStatus('Listening...');
-                            if (recognitionRef.current) recognitionRef.current.start();
-                        }
-                    }, 2000);
+                    mediaRecorderRef.current.start(500);
+                    console.log('Microphone streaming started');
+                    setStatus('Listening...');
+                    if (recognitionRef.current) recognitionRef.current.start();
                 } catch (err) {
                     console.error('Mic error:', err);
                     setError('Microphone permission denied.');
