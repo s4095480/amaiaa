@@ -141,11 +141,11 @@
             const testAudioPlayback = () => {
                 console.log('Testing audio playback with sample PCM');
                 const sampleRate = 16000;
-                const duration = 1; // 1 second
+                const duration = 1;
                 const audioBuffer = audioContext.current.createBuffer(1, sampleRate * duration, sampleRate);
                 const data = audioBuffer.getChannelData(0);
                 for (let i = 0; i < data.length; i++) {
-                    data[i] = Math.sin(2 * Math.PI * 440 * i / sampleRate) * 0.5; // 440Hz sine wave
+                    data[i] = Math.sin(2 * Math.PI * 440 * i / sampleRate) * 0.5;
                 }
                 const source = audioContext.current.createBufferSource();
                 source.buffer = audioBuffer;
@@ -236,7 +236,7 @@
                                     }
                                     responseBuffer.current = '';
                                 }
-                            } else if (data.type === 'audio_event' && data.audio_event?.audio_base_64) {
+                            } else if (data.type === 'audio' && data.audio_event?.audio_base_64) {
                                 console.log('Received audio event, base64 length:', data.audio_event.audio_base_64.length);
                                 try {
                                     const audioBytes = Uint8Array.from(atob(data.audio_event.audio_base_64), c => c.charCodeAt(0));
