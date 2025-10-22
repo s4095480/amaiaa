@@ -136,6 +136,16 @@
                 const chunk = audioQueue.current.shift();
                 console.log('Processing audio chunk, size:', chunk.byteLength);
 
+                // Save chunk for debugging
+                const debugBlob = new Blob([chunk], { type: 'audio/wav' });
+                const debugUrl = URL.createObjectURL(debugBlob);
+                const debugLink = document.createElement('a');
+                debugLink.href = debugUrl;
+                debugLink.download = `agent_response_${Date.now()}.wav`;
+                debugLink.click();
+                // URL.revokeObjectURL(debugUrl); // Keep for fallback
+                console.log('Saved audio chunk as agent_response_[timestamp].wav');
+
                 try {
                     const wavBuffer = createWavBuffer(chunk);
                     console.log('Decoding WAV audio...');
@@ -153,16 +163,8 @@
                 } catch (err) {
                     console.error('Audio decode error:', err.message);
                     isPlaying.current = false;
-                    // Save chunk for debugging
-                    const blob = new Blob([chunk], { type: 'audio/wav' });
-                    const url = URL.createObjectURL(blob);
-                    setFallbackAudioUrl(url); // For <audio> fallback
-                    const link = document.createElement('a');
-                    link.href = url;
-                    link.download = `agent_response_${Date.now()}.wav`;
-                    link.click();
-                    // URL.revokeObjectURL(url); // Keep for fallback player
-                    console.log('Saved audio chunk as agent_response.wav for debugging');
+                    setFallbackAudioUrl(debugUrl); // Use same URL for fallback
+                    console.log('Set fallback audio player with URL');
                     playAudioQueue();
                 }
             };
@@ -215,25 +217,28 @@
                     reconnectAttempts.current = 0;
                     startMicrophone();
                     websocketRef.current.send(JSON.stringify({ type: 'conversation_initiation_client_data' }));
+                    // Send dummy audio to initialize session
+                    const dummyAudio = new Uint8Array(1000).fill(0); // Silent audio
+                    websocketRef.current.send(dummyAudio);
+                    console.log('Sent dummy audio to initialize session');
                     // Start ping
                     pingIntervalRef.current = setInterval(() => {
                         if (websocketRef.current && websocketRef.current.readyState === WebSocket.OPEN) {
                             console.log('Sending ping');
                             websocketRef.current.send(JSON.stringify({ type: 'ping' }));
                         }
-                    }, 10000); // Ping every 10 seconds
+                    }, 5000); // Ping every 5 seconds
                 };
 
                 websocketRef.current.onmessage = (event) => {
                     if (typeof event.data === 'string') {
                         try {
                             const data = JSON.parse(event.data);
-                            console.log('Received text:', data);
-                            if (data.type === 'agent_response' || data.type === 'agent_chat_response_part') {
-                                const text = data.agent_response || data.text_response_part?.text || 'Thinking...';
-                                if (text && text !== 'Thinking...') {
-                                    addToTranscript('Amaia', text);
-                                }
+                            console.log('Received text:', JSON.stringify(data));
+                            if (data.type === 'agent_response' && data.agent_response_event?.agent_response) {
+                                addToTranscript('Amaia', data.agent_response_event.agent_response);
+                            } else if (data.type === 'agent_chat_response_part' && data.text_response_part?.text) {
+                                addToTranscript('Amaia', data.text_response_part.text);
                             }
                         } catch (err) {
                             console.log('Non-JSON message:', event.data);
@@ -243,7 +248,10 @@
                         event.data.arrayBuffer().then(buffer => {
                             audioQueue.current.push(buffer);
                             playAudioQueue();
-                        }).catch(err => console.error('Audio buffer error:', err));
+                        }).catch(err => {
+                            console.error('Audio buffer error:', err.message);
+                            setError('Failed to process audio data');
+                        });
                     }
                 };
 
@@ -264,7 +272,7 @@
                     if (isOnCall && reconnectAttempts.current < maxReconnectAttempts) {
                         reconnectAttempts.current += 1;
                         console.log(`Reconnecting WebSocket, attempt ${reconnectAttempts.current}/${maxReconnectAttempts}`);
-                        setTimeout(connectWebSocket, 2000 * reconnectAttempts.current); // Exponential backoff
+                        setTimeout(connectWebSocket, 2000 * reconnectAttempts.current);
                     }
                 };
             };
@@ -275,6 +283,10 @@
                     mediaRecorderRef.current = new MediaRecorder(stream, { mimeType: 'audio/webm;codecs=opus' });
                     mediaRecorderRef.current.ondataavailable = (event) => {
                         if (event.data.size > 0 && websocketRef.current && websocketRef.current.readyState === WebSocket.OPEN) {
+                            if (event.data.size < 100) {
+                                console.log('Skipping small audio chunk:', event.data.size, 'bytes');
+                                return;
+                            }
                             websocketRef.current.send(event.data);
                             console.log('Sent audio chunk:', event.data.size, 'bytes');
                         } else {
@@ -284,10 +296,15 @@
                     mediaRecorderRef.current.onstop = () => {
                         console.log('MediaRecorder stopped');
                     };
-                    mediaRecorderRef.current.start(250);
-                    console.log('Microphone streaming started');
-                    setStatus('Listening...');
-                    if (recognitionRef.current) recognitionRef.current.start();
+                    // Delay start to ensure stable stream
+                    setTimeout(() => {
+                        if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'inactive') {
+                            mediaRecorderRef.current.start(500); // Increased timeslice
+                            console.log('Microphone streaming started');
+                            setStatus('Listening...');
+                            if (recognitionRef.current) recognitionRef.current.start();
+                        }
+                    }, 1000);
                 } catch (err) {
                     console.error('Mic error:', err);
                     setError('Microphone permission denied.');
