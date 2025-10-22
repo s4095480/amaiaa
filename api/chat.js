@@ -6,46 +6,67 @@ module.exports = async (req, res) => {
   res.setHeader('Content-Type', 'application/json');
 
   if (req.method === 'OPTIONS') {
+    console.log('Handling OPTIONS request');
     res.status(200).end();
     return;
   }
 
-  if (req.method !== 'GET') {
+  if (req.method !== 'POST') {
+    console.log('Invalid method:', req.method);
     res.status(405).json({ error: 'Method not allowed' });
     return;
   }
 
   try {
+    const { message } = req.body;
     const API_KEY = process.env.ELEVENLABS_API_KEY;
-    const AGENT_ID = process.env.AGENT_ID;
+    const VOICE_ID = 'MvVkLH9bosldCRpQiTw1';
 
+    console.log('Received message:', message);
     console.log('API Key exists:', !!API_KEY);
-    console.log('Agent ID:', AGENT_ID);
+    console.log('Voice ID:', VOICE_ID);
 
-    if (!API_KEY || !AGENT_ID) {
-      res.status(400).json({ error: 'Missing API key or agent ID' });
+    if (!message || !API_KEY) {
+      console.log('Missing message or API key');
+      res.status(400).json({ error: 'Missing message or API key' });
       return;
     }
 
-    console.log('Fetching signed URL from ElevenLabs...');
-    const response = await fetch(`https://api.elevenlabs.io/v1/convai/conversation/get-signed-url?agent_id=${AGENT_ID}`, {
-      method: 'GET',
+    // Hardcoded echo response
+    const replyText = `You said "${message}". Talk more?`;
+    console.log('Generated response:', replyText);
+
+    // Call ElevenLabs TTS
+    console.log('Fetching TTS from ElevenLabs...');
+    const ttsResponse = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}`, {
+      method: 'POST',
       headers: {
-        'xi-api-key': API_KEY
-      }
+        'xi-api-key': API_KEY,
+        'Content-Type': 'application/json',
+        'Accept': 'audio/mpeg'
+      },
+      body: JSON.stringify({
+        text: replyText,
+        model_id: 'eleven_monolingual_v1',
+        voice_settings: { stability: 0.5, similarity_boost: 0.75 }
+      })
     });
 
-    console.log('Signed URL response status:', response.status);
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Signed URL error details:', errorText);
-      throw new Error(`Failed to get signed URL: ${response.status} - ${errorText}`);
+    console.log('TTS response status:', ttsResponse.status);
+    if (!ttsResponse.ok) {
+      const errorText = await ttsResponse.text();
+      console.error('TTS error details:', errorText);
+      throw new Error(`TTS request failed: ${ttsResponse.status} - ${errorText}`);
     }
 
-    const data = await response.json();
-    console.log('Signed URL fetched:', data.signed_url.slice(0, 50) + '...');
+    const audioBuffer = await ttsResponse.arrayBuffer();
+    const audioBase64 = Buffer.from(audioBuffer).toString('base64');
+    console.log('Audio base64 length:', audioBase64.length);
 
-    res.status(200).json({ signedUrl: data.signed_url });
+    res.status(200).json({
+      reply: replyText,
+      audioUrl: `data:audio/mpeg;base64,${audioBase64}`
+    });
   } catch (error) {
     console.error('Handler error:', error.message, error.stack);
     res.status(500).json({
