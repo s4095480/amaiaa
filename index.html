@@ -1102,12 +1102,15 @@
             event.target.playVideo();
         }
 
-        function onPlayerStateChange(event) {
-            if (event.data === YT.PlayerState.ENDED) {
-                event.target.seekTo(0);
-                event.target.playVideo();
-            }
-        }
+        // 1. Fix for YouTube video looping - Replace the onPlayerStateChange function with this:
+
+function onPlayerStateChange(event) {
+    // When video ends, loop it by seeking to start and playing again
+    if (event.data === YT.PlayerState.ENDED) {
+        event.target.seekTo(0);
+        event.target.playVideo();
+    }
+}
 
         // Navigation
         function navigateTo(sectionId) {
@@ -1319,57 +1322,65 @@
             `).join('');
         }
 
-        // Populate journal
-        function populateJournal() {
-            const container = document.getElementById('journalEntries');
-            let journalEntries = JSON.parse(localStorage.getItem('journalEntries')) || [
-                { date: '22 October 2025', content: 'Last night’s city lights felt like a love letter to the world. I’m always inspired by the energy of a bustling city. What place makes your heart race? 🏙️' },
-                { date: '21 October 2025', content: 'Spent the day curating a new wardrobe. Less is more—choosing pieces that tell a story. What’s one item in your closet you can’t live without? 👗' }
-            ];
+        // 2. Fix for journal entries - Replace the populateJournal function with this:
 
-            // Add new entry if it's a new day
-            const lastDate = localStorage.getItem('lastJournalDate');
-            const today = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
-            if (!lastDate || lastDate !== today) {
-                const newEntry = {
-                    date: today,
-                    content: `Today I enjoyed a quiet moment reflecting on my journey. What’s your favorite way to unwind? 🌿`
-                };
-                journalEntries.unshift(newEntry);
-                localStorage.setItem('journalEntries', JSON.stringify(journalEntries));
-                localStorage.setItem('lastJournalDate', today);
-            } else {
-                // Update existing entry with current content if it's the same day
-                journalEntries[0].content = `Today I enjoyed a quiet moment reflecting on my journey. What’s your favorite way to unwind? 🌿`;
-                localStorage.setItem('journalEntries', JSON.stringify(journalEntries));
-            }
+function populateJournal() {
+    const container = document.getElementById('journalEntries');
+    let journalEntries = JSON.parse(localStorage.getItem('journalEntries')) || [
+        { date: '22 October 2025', content: 'Last night's city lights felt like a love letter to the world. I'm always inspired by the energy of a bustling city. What place makes your heart race? 🏙️' },
+        { date: '21 October 2025', content: 'Spent the day curating a new wardrobe. Less is more—choosing pieces that tell a story. What's one item in your closet you can't live without? 👗' }
+    ];
 
-            const journalComments = {
-                '22 October 2025': [
-                    { author: '@city_lover', text: 'City energy is unmatched!', likes: 12, amaiaResponse: null },
-                    { author: '@night_walker', text: 'Paris for me!', likes: 8, amaiaResponse: 'Paris is magical! 🏙️' }
-                ],
-                '21 October 2025': [
-                    { author: '@fashion_curator', text: 'Love the wardrobe focus!', likes: 14, amaiaResponse: null },
-                    { author: '@style_seeker', text: 'My favorite is my scarf.', likes: 7, amaiaResponse: null }
-                ],
-                [today]: [
-                    { author: '@reflection_fan', text: 'Love your introspective side!', likes: 10, amaiaResponse: 'Thanks! It’s my quiet time. 🌿' },
-                    { author: '@thoughtful_one', text: 'Great question to ponder.', likes: 6, amaiaResponse: null }
-                ]
-            };
+    // Add new entry if it's a new day
+    const lastDate = localStorage.getItem('lastJournalDate');
+    const today = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
+    
+    if (!lastDate || lastDate !== today) {
+        const newEntry = {
+            date: today,
+            content: `Today, I savoured a peaceful night under the stars, dreaming of new horizons. What inspires you late at night? 🌌`
+        };
+        journalEntries.unshift(newEntry);
+        
+        // Remove duplicate if exists
+        journalEntries = journalEntries.filter((entry, index, self) =>
+            index === self.findIndex((e) => e.date === entry.date)
+        );
+        
+        localStorage.setItem('journalEntries', JSON.stringify(journalEntries));
+        localStorage.setItem('lastJournalDate', today);
+    } else {
+        // Update existing entry with current content if it's the same day (remove date/time from text)
+        journalEntries[0].content = `Today, I savoured a peaceful night under the stars, dreaming of new horizons. What inspires you late at night? 🌌`;
+        localStorage.setItem('journalEntries', JSON.stringify(journalEntries));
+    }
 
-            container.innerHTML = journalEntries.map(j => `
-                <div class="journal-entry">
-                    <div class="journal-date">${j.date}</div>
-                    <div class="journal-content">${j.content}</div>
-                    <div class="journal-actions">
-                        <button class="action-btn" onclick="togglePostLike(this)">❤️ Like</button>
-                        <button class="action-btn" onclick="showExtendedView('${j.date}', 'journal')">💬 Comment</button>
-                    </div>
-                </div>
-            `).join('');
-        }
+    const journalComments = {
+        '22 October 2025': [
+            { author: '@city_lover', text: 'City energy is unmatched!', likes: 12, amaiaResponse: null },
+            { author: '@night_walker', text: 'Paris for me!', likes: 8, amaiaResponse: 'Paris is magical! 🏙️' }
+        ],
+        '21 October 2025': [
+            { author: '@fashion_curator', text: 'Love the wardrobe focus!', likes: 14, amaiaResponse: null },
+            { author: '@style_seeker', text: 'My favorite is my scarf.', likes: 7, amaiaResponse: null }
+        ],
+        [today]: [
+            { author: '@reflection_fan', text: 'Love your introspective side!', likes: 10, amaiaResponse: 'Thanks! It's my quiet time. 🌿' },
+            { author: '@thoughtful_one', text: 'Great question to ponder.', likes: 6, amaiaResponse: null }
+        ]
+    };
+
+    container.innerHTML = journalEntries.map(j => `
+        <div class="journal-entry">
+            <div class="journal-date">${j.date}</div>
+            <div class="journal-content">${j.content}</div>
+            <div class="journal-actions">
+                <button class="action-btn" onclick="togglePostLike(this)">❤️ Like</button>
+                <button class="action-btn" onclick="showExtendedView('${j.date}', 'journal')">💬 Comment</button>
+            </div>
+        </div>
+    `).join('');
+}
 
         // Show extended view
         function showExtendedView(id, type) {
@@ -1380,12 +1391,12 @@
             let item;
             if (type === 'video') {
                 const videos = [
-                    { id: 1, src: 'https://www.youtube.com/embed/m39iD3ivGTQ?si=LcPVE-0K61KKm-i5&autoplay=1&mute=1&loop=1&enablejsapi=1', caption: 'rooftop views in monaco 🌅✨' },
-                    { id: 2, src: 'https://www.youtube.com/embed/xOzHgLnyd0U?si=5rZVSldwjUrTjKJx&autoplay=1&mute=1&loop=1&enablejsapi=1', caption: 'unboxing my new collection' },
-                    { id: 3, src: 'https://www.youtube.com/embed/-3IijttdZSU?si=C4KvL8PY4vV9Lz3j&autoplay=1&mute=1&loop=1&enablejsapi=1', caption: 'sunset cocktails with the city below' },
-                    { id: 4, src: 'https://www.youtube.com/embed/C5q5LxfghNs?si=Qtm4mjy34VAeVckV&autoplay=1&mute=1&loop=1&enablejsapi=1', caption: 'golden hour in paris' },
-                    { id: 5, src: 'https://www.youtube.com/embed/Veq-zroppHA?si=WzdNV8kswZ9rUDsF&autoplay=1&mute=1&loop=1&enablejsapi=1', caption: 'fashion week behind the scenes' },
-                    { id: 6, src: 'https://www.youtube.com/embed/gESVxTjS2aU?si=j6BrkP7JVrpaUbjv&autoplay=1&mute=1&loop=1&enablejsapi=1', caption: 'private jet diaries' }
+                    { id: 1, src: 'https://www.youtube.com/embed/m39iD3ivGTQ?si=LcPVE-0K61KKm-i5&autoplay=1&mute=1&loop=1&playlist=m39iD3ivGTQ&enablejsapi=1', caption: 'rooftop views in monaco 🌅✨' },
+                    { id: 2, src: 'https://www.youtube.com/embed/xOzHgLnyd0U?si=5rZVSldwjUrTjKJx&autoplay=1&mute=1&loop=1&playlist=xOzHgLnyd0U&enablejsapi=1', caption: 'unboxing my new collection' },
+                    { id: 3, src: 'https://www.youtube.com/embed/-3IijttdZSU?si=C4KvL8PY4vV9Lz3j&autoplay=1&mute=1&loop=1&playlist=-3IijttdZSU&enablejsapi=1', caption: 'sunset cocktails with the city below' },
+                    { id: 4, src: 'https://www.youtube.com/embed/C5q5LxfghNs?si=Qtm4mjy34VAeVckV&autoplay=1&mute=1&loop=1&playlist=C5q5LxfghNs&enablejsapi=1', caption: 'golden hour in paris' },
+                    { id: 5, src: 'https://www.youtube.com/embed/Veq-zroppHA?si=WzdNV8kswZ9rUDsF&autoplay=1&mute=1&loop=1&playlist=Veq-zroppHA&enablejsapi=1', caption: 'fashion week behind the scenes' },
+                    { id: 6, src: 'https://www.youtube.com/embed/gESVxTjS2aU?si=j6BrkP7JVrpaUbjv&autoplay=1&mute=1&loop=1&playlist=gESVxTjS2aU&enablejsapi=1', caption: 'private jet diaries' }
                 ];
                 item = videos.find(v => v.id === id);
                 mediaContainer.innerHTML = `
