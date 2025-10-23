@@ -122,7 +122,7 @@
             font-size: 20px;
             color: #00FFFF;
             margin-bottom: 48px;
-            font-weight: 500; /* Slightly less bold */
+            font-weight: 500;
         }
 
         .cta-button {
@@ -506,7 +506,7 @@
             max-width: 600px;
         }
 
-        .extended-media video, .extended-media img {
+        .extended-media video, .extended-media img, .extended-media iframe {
             width: 100%;
             height: 100%;
             object-fit: cover;
@@ -741,7 +741,7 @@
         <div class="video-feed">
             <div class="video-item" data-video-id="1" onclick="showExtendedView(1, 'video')">
                 <iframe src="https://www.youtube.com/embed/m39iD3ivGTQ?si=LcPVE-0K61KKm-i5&autoplay=1&mute=1&loop=1" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen style="width: 100%; height: 100%; border: none;"></iframe>
-                <div class="muted-indicator">Click to unmute</div>
+                <div class="muted-indicator" onclick="event.stopPropagation(); toggleIframeMute(1)">Click to unmute</div>
                 <div class="video-overlay">
                     <div class="video-caption">rooftop views in monaco 🌅✨</div>
                     <div class="video-actions">
@@ -755,11 +755,8 @@
                 </div>
             </div>
             <div class="video-item" data-video-id="2" onclick="showExtendedView(2, 'video')">
-                <video controls muted>
-                    <source src="https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_2mb.mp4" type="video/mp4">
-                    Your browser does not support the video tag.
-                </video>
-                <div class="muted-indicator">Click to unmute</div>
+                <iframe src="https://www.youtube.com/embed/xOzHgLnyd0U?si=5rZVSldwjUrTjKJx&autoplay=1&mute=1&loop=1" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen style="width: 100%; height: 100%; border: none;"></iframe>
+                <div class="muted-indicator" onclick="event.stopPropagation(); toggleIframeMute(2)">Click to unmute</div>
                 <div class="video-overlay">
                     <div class="video-caption">unboxing my new collection</div>
                     <div class="video-actions">
@@ -768,6 +765,66 @@
                         </button>
                         <button class="video-action" onclick="event.stopPropagation(); showExtendedView(2, 'video')">
                             💬 <span>892</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="video-item" data-video-id="3" onclick="showExtendedView(3, 'video')">
+                <iframe src="https://www.youtube.com/embed/-3IijttdZSU?si=C4KvL8PY4vV9Lz3j&autoplay=1&mute=1&loop=1" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen style="width: 100%; height: 100%; border: none;"></iframe>
+                <div class="muted-indicator" onclick="event.stopPropagation(); toggleIframeMute(3)">Click to unmute</div>
+                <div class="video-overlay">
+                    <div class="video-caption">sunset cocktails with the city below</div>
+                    <div class="video-actions">
+                        <button class="video-action" onclick="event.stopPropagation(); toggleVideoLike(this)">
+                            ❤️ <span>312K</span>
+                        </button>
+                        <button class="video-action" onclick="event.stopPropagation(); showExtendedView(3, 'video')">
+                            💬 <span>2.1K</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="video-item" data-video-id="4" onclick="showExtendedView(4, 'video')">
+                <iframe src="https://www.youtube.com/embed/C5q5LxfghNs?si=Qtm4mjy34VAeVckV&autoplay=1&mute=1&loop=1" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen style="width: 100%; height: 100%; border: none;"></iframe>
+                <div class="muted-indicator" onclick="event.stopPropagation(); toggleIframeMute(4)">Click to unmute</div>
+                <div class="video-overlay">
+                    <div class="video-caption">golden hour in paris</div>
+                    <div class="video-actions">
+                        <button class="video-action" onclick="event.stopPropagation(); toggleVideoLike(this)">
+                            ❤️ <span>278K</span>
+                        </button>
+                        <button class="video-action" onclick="event.stopPropagation(); showExtendedView(4, 'video')">
+                            💬 <span>1.5K</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="video-item" data-video-id="5" onclick="showExtendedView(5, 'video')">
+                <iframe src="https://www.youtube.com/embed/Veq-zroppHA?si=WzdNV8kswZ9rUDsF&autoplay=1&mute=1&loop=1" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen style="width: 100%; height: 100%; border: none;"></iframe>
+                <div class="muted-indicator" onclick="event.stopPropagation(); toggleIframeMute(5)">Click to unmute</div>
+                <div class="video-overlay">
+                    <div class="video-caption">fashion week behind the scenes</div>
+                    <div class="video-actions">
+                        <button class="video-action" onclick="event.stopPropagation(); toggleVideoLike(this)">
+                            ❤️ <span>401K</span>
+                        </button>
+                        <button class="video-action" onclick="event.stopPropagation(); showExtendedView(5, 'video')">
+                            💬 <span>3.2K</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="video-item" data-video-id="6" onclick="showExtendedView(6, 'video')">
+                <iframe src="https://www.youtube.com/embed/gESVxTjS2aU?si=j6BrkP7JVrpaUbjv&autoplay=1&mute=1&loop=1" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen style="width: 100%; height: 100%; border: none;"></iframe>
+                <div class="muted-indicator" onclick="event.stopPropagation(); toggleIframeMute(6)">Click to unmute</div>
+                <div class="video-overlay">
+                    <div class="video-caption">private jet diaries</div>
+                    <div class="video-actions">
+                        <button class="video-action" onclick="event.stopPropagation(); toggleVideoLike(this)">
+                            ❤️ <span>523K</span>
+                        </button>
+                        <button class="video-action" onclick="event.stopPropagation(); showExtendedView(6, 'video')">
+                            💬 <span>4.8K</span>
                         </button>
                     </div>
                 </div>
@@ -929,15 +986,16 @@
             document.getElementById(sectionId).scrollIntoView({ behavior: 'smooth' });
         }
 
-        // Toggle video mute
-        function toggleVideoMute(element) {
-            const video = element.querySelector('video');
-            const indicator = element.querySelector('.muted-indicator');
-            if (video.muted) {
-                video.muted = false;
+        // Toggle iframe mute
+        function toggleIframeMute(videoId) {
+            const iframe = document.querySelector(`.video-item[data-video-id="${videoId}"] iframe`);
+            const indicator = document.querySelector(`.video-item[data-video-id="${videoId}"] .muted-indicator`);
+            const src = iframe.src;
+            if (src.includes('mute=1')) {
+                iframe.src = src.replace('mute=1', 'mute=0');
                 indicator.textContent = '🔊 Unmuted';
             } else {
-                video.muted = true;
+                iframe.src = src.replace('mute=0', 'mute=1') || src + '&mute=1';
                 indicator.textContent = 'Click to unmute';
             }
         }
@@ -1004,12 +1062,12 @@
         function populateVideos(view) {
             const container = document.getElementById('videoViewContainer');
             const videos = [
-                { id: 1, src: 'https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4', caption: 'rooftop views in monaco 🌅✨', likes: '234K', comments: '1.2K' },
-                { id: 2, src: 'https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_2mb.mp4', caption: 'unboxing my new collection', likes: '189K', comments: '892' },
-                { id: 3, src: 'https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4', caption: 'sunset cocktails with the city below', likes: '312K', comments: '2.1K' },
-                { id: 4, src: 'https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_2mb.mp4', caption: 'golden hour in paris', likes: '278K', comments: '1.5K' },
-                { id: 5, src: 'https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4', caption: 'fashion week behind the scenes', likes: '401K', comments: '3.2K' },
-                { id: 6, src: 'https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_2mb.mp4', caption: 'private jet diaries', likes: '523K', comments: '4.8K' }
+                { id: 1, src: 'https://www.youtube.com/embed/m39iD3ivGTQ?si=LcPVE-0K61KKm-i5&autoplay=1&mute=1&loop=1', caption: 'rooftop views in monaco 🌅✨', likes: '234K', comments: '1.2K' },
+                { id: 2, src: 'https://www.youtube.com/embed/xOzHgLnyd0U?si=5rZVSldwjUrTjKJx&autoplay=1&mute=1&loop=1', caption: 'unboxing my new collection', likes: '189K', comments: '892' },
+                { id: 3, src: 'https://www.youtube.com/embed/-3IijttdZSU?si=C4KvL8PY4vV9Lz3j&autoplay=1&mute=1&loop=1', caption: 'sunset cocktails with the city below', likes: '312K', comments: '2.1K' },
+                { id: 4, src: 'https://www.youtube.com/embed/C5q5LxfghNs?si=Qtm4mjy34VAeVckV&autoplay=1&mute=1&loop=1', caption: 'golden hour in paris', likes: '278K', comments: '1.5K' },
+                { id: 5, src: 'https://www.youtube.com/embed/Veq-zroppHA?si=WzdNV8kswZ9rUDsF&autoplay=1&mute=1&loop=1', caption: 'fashion week behind the scenes', likes: '401K', comments: '3.2K' },
+                { id: 6, src: 'https://www.youtube.com/embed/gESVxTjS2aU?si=j6BrkP7JVrpaUbjv&autoplay=1&mute=1&loop=1', caption: 'private jet diaries', likes: '523K', comments: '4.8K' }
             ];
 
             const videoComments = {
@@ -1040,12 +1098,9 @@
             };
 
             container.innerHTML = videos.map(v => `
-                <div class="${view === 'tiktok' ? 'tiktok-video' : 'video-item'}" onclick="showExtendedView(${v.id}, 'video')">
-                    <video controls muted>
-                        <source src="${v.src}" type="video/mp4">
-                        Your browser does not support the video tag.
-                    </video>
-                    <div class="muted-indicator" onclick="event.stopPropagation(); toggleVideoMute(this.parentElement)">Click to unmute</div>
+                <div class="${view === 'tiktok' ? 'tiktok-video' : 'video-item'}" data-video-id="${v.id}" onclick="showExtendedView(${v.id}, 'video')">
+                    <iframe src="${v.src}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen style="width: 100%; height: 100%; border: none;"></iframe>
+                    <div class="muted-indicator" onclick="event.stopPropagation(); toggleIframeMute(${v.id})">Click to unmute</div>
                     <div class="video-overlay">
                         <div class="video-caption">${v.caption}</div>
                         <div class="video-actions">
@@ -1196,19 +1251,16 @@
             let item;
             if (type === 'video') {
                 const videos = [
-                    { id: 1, src: 'https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4', caption: 'rooftop views in monaco 🌅✨' },
-                    { id: 2, src: 'https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_2mb.mp4', caption: 'unboxing my new collection' },
-                    { id: 3, src: 'https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4', caption: 'sunset cocktails with the city below' },
-                    { id: 4, src: 'https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_2mb.mp4', caption: 'golden hour in paris' },
-                    { id: 5, src: 'https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_1mb.mp4', caption: 'fashion week behind the scenes' },
-                    { id: 6, src: 'https://sample-videos.com/video123/mp4/720/big_buck_bunny_720p_2mb.mp4', caption: 'private jet diaries' }
+                    { id: 1, src: 'https://www.youtube.com/embed/m39iD3ivGTQ?si=LcPVE-0K61KKm-i5&autoplay=1&mute=1&loop=1', caption: 'rooftop views in monaco 🌅✨' },
+                    { id: 2, src: 'https://www.youtube.com/embed/xOzHgLnyd0U?si=5rZVSldwjUrTjKJx&autoplay=1&mute=1&loop=1', caption: 'unboxing my new collection' },
+                    { id: 3, src: 'https://www.youtube.com/embed/-3IijttdZSU?si=C4KvL8PY4vV9Lz3j&autoplay=1&mute=1&loop=1', caption: 'sunset cocktails with the city below' },
+                    { id: 4, src: 'https://www.youtube.com/embed/C5q5LxfghNs?si=Qtm4mjy34VAeVckV&autoplay=1&mute=1&loop=1', caption: 'golden hour in paris' },
+                    { id: 5, src: 'https://www.youtube.com/embed/Veq-zroppHA?si=WzdNV8kswZ9rUDsF&autoplay=1&mute=1&loop=1', caption: 'fashion week behind the scenes' },
+                    { id: 6, src: 'https://www.youtube.com/embed/gESVxTjS2aU?si=j6BrkP7JVrpaUbjv&autoplay=1&mute=1&loop=1', caption: 'private jet diaries' }
                 ];
                 item = videos.find(v => v.id === id);
                 mediaContainer.innerHTML = `
-                    <video controls muted>
-                        <source src="${item.src}" type="video/mp4">
-                        Your browser does not support the video tag.
-                    </video>
+                    <iframe src="${item.src}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen style="width: 100%; height: 100%; border: none;"></iframe>
                     <div class="video-overlay">
                         <div class="video-caption">${item.caption}</div>
                     </div>
@@ -1362,10 +1414,9 @@
             const observer = new IntersectionObserver((entries) => {
                 entries.forEach(entry => {
                     if (entry.isIntersecting) {
-                        const video = entry.target.querySelector('video');
-                        if (video) {
-                            video.play().catch(error => console.log('Auto-play prevented:', error));
-                            video.muted = true;
+                        const iframe = entry.target.querySelector('iframe');
+                        if (iframe) {
+                            iframe.src += ''; // Forces reload to trigger autoplay
                         }
                     }
                 });
