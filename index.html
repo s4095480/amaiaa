@@ -846,4 +846,217 @@
 
     <script>
         // Navigation
-        function navig
+        function navigateTo(sectionId) {
+            document.getElementById(sectionId).scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // Toggle video mute
+        function toggleVideoMute(element) {
+            const indicator = element.querySelector('.muted-indicator');
+            if (indicator.textContent === 'Click to unmute') {
+                indicator.textContent = '🔊 Unmuted';
+                // In real implementation, unmute the actual video
+            } else {
+                indicator.textContent = 'Click to unmute';
+                // In real implementation, mute the video
+            }
+        }
+
+        // Toggle video like
+        function toggleVideoLike(button) {
+            button.classList.toggle('liked');
+            const countSpan = button.querySelector('span:last-child');
+            let count = parseInt(countSpan.textContent.replace('K', '')) * 1000;
+            if (button.classList.contains('liked')) {
+                count += 1;
+            } else {
+                count -= 1;
+            }
+            countSpan.textContent = (count / 1000).toFixed(1) + 'K';
+        }
+
+        // Toggle post like
+        function togglePostLike(button) {
+            button.classList.toggle('liked');
+            if (button.classList.contains('liked')) {
+                button.textContent = '❤️ Liked';
+            } else {
+                button.textContent = '❤️ Like';
+            }
+        }
+
+        // Show videos modal
+        function showVideosModal() {
+            document.getElementById('videosModal').classList.add('active');
+            populateVideos('tiktok');
+        }
+
+        // Show feed modal
+        function showFeedModal() {
+            document.getElementById('feedModal').classList.add('active');
+            populateFeed();
+        }
+
+        // Close modal
+        function closeModal(modalId) {
+            document.getElementById(modalId).classList.remove('active');
+        }
+
+        // Switch video view
+        function switchVideoView(view) {
+            const container = document.getElementById('videoViewContainer');
+            const tiktokBtn = document.getElementById('tiktokViewBtn');
+            const gridBtn = document.getElementById('gridViewBtn');
+            
+            if (view === 'tiktok') {
+                container.className = 'tiktok-view';
+                tiktokBtn.classList.add('active');
+                gridBtn.classList.remove('active');
+            } else {
+                container.className = 'instagram-grid';
+                tiktokBtn.classList.remove('active');
+                gridBtn.classList.add('active');
+            }
+            populateVideos(view);
+        }
+
+        // Populate videos
+        function populateVideos(view) {
+            const container = document.getElementById('videoViewContainer');
+            const videos = [
+                { id: 1, emoji: '🎥', caption: 'rooftop views in monaco 🌅✨', likes: '234K', comments: '1.2K' },
+                { id: 2, emoji: '💎', caption: 'unboxing my new collection', likes: '189K', comments: '892' },
+                { id: 3, emoji: '🍸', caption: 'sunset cocktails with the city below', likes: '312K', comments: '2.1K' },
+                { id: 4, emoji: '🌆', caption: 'golden hour in paris', likes: '278K', comments: '1.5K' },
+                { id: 5, emoji: '👗', caption: 'fashion week behind the scenes', likes: '401K', comments: '3.2K' },
+                { id: 6, emoji: '✈️', caption: 'private jet diaries', likes: '523K', comments: '4.8K' }
+            ];
+
+            container.innerHTML = videos.map(v => {
+                if (view === 'tiktok') {
+                    return `
+                        <div class="tiktok-video" onclick="toggleVideoMute(this)">
+                            <div class="video-placeholder">${v.emoji}</div>
+                            <div class="muted-indicator">Click to unmute</div>
+                            <div class="video-overlay">
+                                <div class="video-caption">${v.caption}</div>
+                                <div class="video-actions">
+                                    <button class="video-action" onclick="event.stopPropagation(); toggleVideoLike(this)">
+                                        <span>❤️</span> <span>${v.likes}</span>
+                                    </button>
+                                    <button class="video-action" onclick="event.stopPropagation(); showComments(${v.id})">
+                                        <span>💬</span> <span>${v.comments}</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    return `
+                        <div class="video-item" onclick="toggleVideoMute(this)">
+                            <div class="video-placeholder">${v.emoji}</div>
+                            <div class="muted-indicator">Click to unmute</div>
+                            <div class="video-overlay">
+                                <div class="video-caption">${v.caption}</div>
+                                <div class="video-actions">
+                                    <button class="video-action" onclick="event.stopPropagation(); toggleVideoLike(this)">
+                                        <span>❤️</span> <span>${v.likes}</span>
+                                    </button>
+                                    <button class="video-action" onclick="event.stopPropagation(); showComments(${v.id})">
+                                        <span>💬</span> <span>${v.comments}</span>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                }
+            }).join('');
+        }
+
+        // Populate feed
+        function populateFeed() {
+            const container = document.getElementById('feedViewContainer');
+            const posts = [
+                { id: 1, emoji: '✨', caption: 'Sometimes the best luxury is a quiet moment above the city. What does luxury mean to you? 💭' },
+                { id: 2, emoji: '🌃', caption: 'City lights and late nights. This view never gets old. 🏙️✨' },
+                { id: 3, emoji: '👗', caption: 'New season, new wardrobe. Minimalism meets elegance. 🤍' },
+                { id: 4, emoji: '🥂', caption: 'Celebrating the small wins. What are you grateful for today? 💫' },
+                { id: 5, emoji: '🌺', caption: 'Self-care isn\'t selfish. Taking time for yourself is luxury. 🧘‍♀️' },
+                { id: 6, emoji: '🛍️', caption: 'Quality over quantity, always. Building a wardrobe that lasts. ✨' },
+                { id: 7, emoji: '🏝️', caption: 'Island escape. Sometimes you need to disconnect to reconnect.' },
+                { id: 8, emoji: '💄', caption: 'The details matter. Perfecting the everyday ritual.' },
+                { id: 9, emoji: '📸', caption: 'Capturing moments that feel timeless. What\'s your favorite memory?' }
+            ];
+
+            container.innerHTML = posts.map(p => `
+                <div class="instagram-post" data-post-id="${p.id}" onclick="showComments(${p.id}, 'post')">
+                    <div class="post-image">${p.emoji}</div>
+                    <div class="post-content">
+                        <div class="post-header">
+                            <div class="post-avatar"></div>
+                            <span class="post-username">@amaiavoss</span>
+                        </div>
+                        <p class="post-caption">${p.caption}</p>
+                        <div class="post-actions">
+                            <button class="action-btn" onclick="event.stopPropagation(); togglePostLike(this)">❤️ Like</button>
+                            <button class="action-btn" onclick="event.stopPropagation(); showComments(${p.id}, 'post')">💬 Comment</button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Show comments
+        function showComments(id, type = 'video') {
+            const modal = document.getElementById('commentsModal');
+            const content = document.getElementById('commentsContent');
+            
+            const comments = [
+                { author: '@fan_user_1', text: 'This is absolutely stunning! 😍' },
+                { author: '@luxury_lover', text: 'I need to know where this is!!' },
+                { author: '@aspiring_influencer', text: 'You inspire me every day ✨' },
+                { author: '@style_icon', text: 'The aesthetic is unmatched' },
+                { author: '@amaia_stan', text: 'Queen behavior 👑' }
+            ];
+
+            content.innerHTML = comments.map(c => `
+                <div class="comment">
+                    <div class="comment-author">${c.author}</div>
+                    <div class="comment-text">${c.text}</div>
+                </div>
+            `).join('');
+
+            modal.classList.add('active');
+        }
+
+        // Auto-play videos on scroll (muted)
+        document.addEventListener('DOMContentLoaded', function() {
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        const video = entry.target;
+                        // In real implementation, play the video muted
+                        console.log('Auto-playing video:', video.dataset.videoId);
+                    }
+                });
+            }, { threshold: 0.5 });
+
+            document.querySelectorAll('.video-item').forEach(video => {
+                observer.observe(video);
+            });
+        });
+
+        // Close modals on escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                document.querySelectorAll('.modal.active').forEach(modal => {
+                    modal.classList.remove('active');
+                });
+                document.querySelectorAll('.comments-modal.active').forEach(modal => {
+                    modal.classList.remove('active');
+                });
+            }
+        });
+    </script>
+</body>
+</html>
