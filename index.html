@@ -45,8 +45,9 @@
             const lastUserInput = useRef('');
             const lastTranscriptionTime = useRef(0);
             const retryQueue = useRef([]);
+            const amaiaGreeting = useRef('Hey it\'s Amaia! I\'m here with you. What would you like to share?');
 
-            // Initialize separate AudioContexts for input and playback
+            // Initialize AudioContexts
             useEffect(() => {
                 audioContext.current = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
                 playbackContext.current = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
@@ -70,7 +71,7 @@
                 };
             }, []);
 
-            // Local speech recognition for UI transcript
+            // Local speech recognition
             useEffect(() => {
                 const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
                 if (SpeechRecognition) {
@@ -87,11 +88,12 @@
                         console.log('Interim transcript:', transcript);
                         if (event.results[event.results.length - 1].isFinal) {
                             const finalTranscript = event.results[event.results.length - 1][0].transcript.trim();
-                            if (finalTranscript && finalTranscript !== lastResponse.current) {
+                            // Filter out Amaia's greeting
+                            if (finalTranscript && finalTranscript !== lastResponse.current && 
+                                !finalTranscript.toLowerCase().includes(amaiaGreeting.current.toLowerCase().slice(0, 20))) {
                                 addToTranscript('You', finalTranscript);
                                 lastUserInput.current = finalTranscript;
                                 lastTranscriptionTime.current = Date.now();
-                                // Add to retry queue
                                 retryQueue.current.push(finalTranscript);
                             }
                         }
@@ -112,18 +114,25 @@
                 }
             }, [isOnCall, isConnected]);
 
-            // Retry sending user input if no server response
+            // Retry sending user input
             useEffect(() => {
                 const checkResponse = () => {
                     if (lastUserInput.current && Date.now() - lastTranscriptionTime.current > 5000 && retryQueue.current.length > 0) {
                         const transcript = retryQueue.current[0];
                         console.log('No server response for:', transcript, 'Retrying...');
                         setError('Amaia didn’t respond. Using fallback response.');
-                        const fallbackResponse = transcript.toLowerCase().includes('hear me') ? 
-                            "Hey there! I can hear you perfectly. What's on your mind?" : 
-                            "I'm here, just thinking about what you said! Want to share more?";
+                        let fallbackResponse;
+                        if (transcript.toLowerCase().includes('hear me')) {
+                            fallbackResponse = "Hey there! I can hear you perfectly. What's on your mind?";
+                        } else if (transcript.toLowerCase().includes('how are you')) {
+                            fallbackResponse = "I'm doing great, thanks for asking! How about you?";
+                        } else if (transcript.toLowerCase().includes('yourself')) {
+                            fallbackResponse = "I'm Amaia, your friendly AI companion, built to chat and help out. Tell me more about you!";
+                        } else {
+                            fallbackResponse = "I'm here, just thinking about what you said! Want to share more?";
+                        }
                         addToTranscript('Amaia', fallbackResponse);
-                        retryQueue.current.shift(); // Remove from queue
+                        retryQueue.current.shift();
                         lastTranscriptionTime.current = Date.now();
                     }
                 };
@@ -148,26 +157,23 @@
                 const buffer = new ArrayBuffer(44 + dataSize);
                 const view = new DataView(buffer);
 
-                // WAV Header
                 view.setUint32(0, 0x52494646, false); // "RIFF"
-                view.setUint32(4, 36 + dataSize, true); // Chunk size
+                view.setUint32(4, 36 + dataSize, true);
                 view.setUint32(8, 0x57415645, false); // "WAVE"
                 view.setUint32(12, 0x666d7420, false); // "fmt "
-                view.setUint32(16, 16, true); // Subchunk1Size (16 for PCM)
-                view.setUint16(20, 1, true); // AudioFormat (1 for PCM)
-                view.setUint16(22, numChannels, true); // NumChannels
-                view.setUint32(24, sampleRate, true); // SampleRate
-                view.setUint32(28, byteRate, true); // ByteRate
-                view.setUint16(32, blockAlign, true); // BlockAlign
-                view.setUint16(34, bitsPerSample, true); // BitsPerSample
+                view.setUint32(16, 16, true);
+                view.setUint16(20, 1, true); // PCM
+                view.setUint16(22, numChannels, true);
+                view.setUint32(24, sampleRate, true);
+                view.setUint32(28, byteRate, true);
+                view.setUint16(32, blockAlign, true);
+                view.setUint16(34, bitsPerSample, true);
                 view.setUint32(36, 0x64617461, false); // "data"
-                view.setUint32(40, dataSize, true); // Subchunk2Size
+                view.setUint32(40, dataSize, true);
 
-                // PCM Data
                 for (let i = 0; i < pcmData.length; i++) {
                     view.setUint8(44 + i, pcmData[i]);
                 }
-
                 return new Blob([view], { type: 'audio/wav' });
             };
 
@@ -179,23 +185,17 @@
                 let nonZeroCount = 0;
                 let outOfRange = 0;
                 for (let i = 0; i < Math.min(audioBytes.length, 100); i++) {
-                    if (audioBytes[i] !== 0 && audioBytes[i] !== 255) {
-                        nonZeroCount++;
-                    }
-                    if (audioBytes[i] < 10 || audioBytes[i] > 245) {
-                        outOfRange++;
-                    }
+                    if (audioBytes[i] !== 0 && audioBytes[i] !== 255) nonZeroCount++;
+                    if (audioBytes[i] < 10 || audioBytes[i] > 245) outOfRange++;
                 }
                 const nonZeroRatio = nonZeroCount / Math.min(audioBytes.length, 100);
                 const outOfRangeRatio = outOfRange / Math.min(audioBytes.length, 100);
                 console.log('PCM validation: nonZeroRatio=', nonZeroRatio, 'outOfRangeRatio=', outOfRangeRatio);
-                // Log first 20 samples for debugging
                 const floatArray = new Float32Array(Math.min(20, Math.floor(audioBytes.length / 2)));
                 for (let i = 0; i < floatArray.length; i++) {
                     floatArray[i] = ((audioBytes[i * 2] | (audioBytes[i * 2 + 1] << 8)) - 32768) / 32768;
                 }
                 console.log('First 20 PCM samples:', floatArray);
-                // Relaxed validation
                 return nonZeroRatio >= 0.1;
             };
 
@@ -211,9 +211,12 @@
                 }
                 console.log('Processing audio chunk, size:', chunk.byteLength);
 
-                // Mute microphone during playback to prevent feedback
+                // Mute microphone and stop speech recognition
                 if (mediaStreamRef.current) {
                     mediaStreamRef.current.getAudioTracks().forEach(track => track.enabled = false);
+                }
+                if (recognitionRef.current) {
+                    recognitionRef.current.stop();
                 }
 
                 try {
@@ -226,9 +229,11 @@
                     source.onended = () => {
                         console.log('Audio chunk ended');
                         isPlaying.current = false;
-                        // Re-enable microphone
                         if (mediaStreamRef.current) {
                             mediaStreamRef.current.getAudioTracks().forEach(track => track.enabled = true);
+                        }
+                        if (recognitionRef.current && isOnCall && isConnected) {
+                            recognitionRef.current.start();
                         }
                         playAudioQueue();
                     };
@@ -245,15 +250,17 @@
                             console.log('Fallback WAV playback ended');
                             URL.revokeObjectURL(url);
                             isPlaying.current = false;
-                            // Re-enable microphone
                             if (mediaStreamRef.current) {
                                 mediaStreamRef.current.getAudioTracks().forEach(track => track.enabled = true);
+                            }
+                            if (recognitionRef.current && isOnCall && isConnected) {
+                                recognitionRef.current.start();
                             }
                             playAudioQueue();
                         };
                     }).catch(e => {
                         console.error('Fallback playback error:', e);
-                        setError('Failed to play audio. Check server audio format.');
+                        setError('Failed to play audio.');
                         isPlaying.current = false;
                         playAudioQueue();
                     });
@@ -281,10 +288,10 @@
                 setStatus('Connecting to Amaia...');
                 setCallTranscript([{
                     speaker: 'Amaia',
-                    text: "Hey, I'm so glad you called. Talk to me.",
+                    text: amaiaGreeting.current,
                     time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
                 }]);
-                lastResponse.current = "Hey, I'm so glad you called. Talk to me.";
+                lastResponse.current = amaiaGreeting.current;
                 reconnectAttempts.current = 0;
                 connectWebSocket();
             };
@@ -328,19 +335,19 @@
                                 if (data.agent_response_event.agent_response !== lastResponse.current) {
                                     addToTranscript('Amaia', data.agent_response_event.agent_response);
                                     lastTranscriptionTime.current = Date.now();
-                                    retryQueue.current = []; // Clear retry queue on server response
+                                    retryQueue.current = [];
                                 }
                             } else if (data.type === 'agent_chat_response_part' && data.text_response_part) {
                                 if (data.text_response_part.type === 'start') {
                                     responseBuffer.current = '';
-                                    audioQueue.current = []; // Clear audio queue for new response
+                                    audioQueue.current = [];
                                 } else if (data.text_response_part.type === 'delta' && data.text_response_part.text) {
                                     responseBuffer.current += data.text_response_part.text;
                                 } else if (data.text_response_part.type === 'stop' && responseBuffer.current) {
                                     if (responseBuffer.current !== lastResponse.current) {
                                         addToTranscript('Amaia', responseBuffer.current);
                                         lastTranscriptionTime.current = Date.now();
-                                        retryQueue.current = []; // Clear retry queue
+                                        retryQueue.current = [];
                                     }
                                     responseBuffer.current = '';
                                 }
@@ -414,7 +421,7 @@
                             } else if (data.type === 'user_transcription_event' && data.user_transcription_event?.user_transcript) {
                                 console.log('Server received user transcript:', data.user_transcription_event.user_transcript);
                                 lastTranscriptionTime.current = Date.now();
-                                retryQueue.current = []; // Clear retry queue
+                                retryQueue.current = [];
                             } else {
                                 console.log('Unhandled message type:', data.type);
                             }
@@ -452,7 +459,7 @@
 
             const startMicrophone = async () => {
                 try {
-                    const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } });
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, sampleRate: 16000, channelCount: 1 } });
                     mediaStreamRef.current = stream;
                     const source = audioContext.current.createMediaStreamSource(stream);
                     scriptProcessorRef.current = audioContext.current.createScriptProcessor(4096, 1, 1);
@@ -466,7 +473,6 @@
                                 const s = Math.max(-1, Math.min(1, input[i]));
                                 view.setInt16(i * 2, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
                             }
-                            // Log first 10 samples for debugging
                             const floatArray = new Float32Array(Math.min(10, input.length));
                             for (let i = 0; i < floatArray.length; i++) {
                                 floatArray[i] = input[i];
@@ -623,7 +629,5 @@
 
         ReactDOM.render(<AmaiaPlatform />, document.getElementById('root'));
     </script>
-    <elevenlabs-convai agent-id="agent_2401k7zqr76sejkt2xcszb3gqy9j"></elevenlabs-convai>
-<script src="https://unpkg.com/@elevenlabs/convai-widget-embed" async type="text/javascript"></script>
 </body>
 </html>
