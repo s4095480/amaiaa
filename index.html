@@ -103,6 +103,18 @@
             .video-feed { max-width: 300px; }
             .tiktok-view { max-width: 300px; }
             #chat-section { min-height: 50vh; }
+
+            .comment-amaia {
+    border-left: 2px solid #FF00FF;
+    padding-left: 12px;
+    font-style: italic;
+    background-color: #fdf0ff;
+}
+            .interacted {
+    opacity: 0.95;
+}
+
+
         }
     </style>
 </head>
@@ -909,6 +921,15 @@
             nav.style.display = 'flex';
             nav.style.position = 'fixed';
         });
+        <div class="comment comment-amaia">
+    <div class="comment-author">@amaiavoss</div>
+    <div class="comment-text">${c.amaiaResponse}</div>
+</div>
+localStorage.setItem(`interacted_${postId}`, true);
+if(localStorage.getItem(`interacted_${p.id}`)) {
+    post.classList.add('interacted');
+}
+
     </script>
 </body>
 </html>
