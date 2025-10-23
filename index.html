@@ -6,7 +6,7 @@
     <title>Amaia Voss - AI Celebrity</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;400;600;700&family=Rubik:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;400;600;700&family=Roboto:wght@400;500;700&family=Rubik:wght@300;400;500;600&display=swap" rel="stylesheet">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>✨</text></svg>">
     <style>
         * {
@@ -122,7 +122,7 @@
             font-size: 20px;
             color: #00FFFF;
             margin-bottom: 48px;
-            font-weight: 300;
+            font-weight: 600; /* Semi-bold for emphasis */
         }
 
         .cta-button {
@@ -272,6 +272,7 @@
             display: flex;
             gap: 12px;
             font-size: 12px;
+            font-family: 'Roboto', sans-serif;
         }
 
         .video-action {
@@ -379,6 +380,7 @@
             color: #00FFFF;
             cursor: pointer;
             font-size: 12px;
+            font-family: 'Roboto', sans-serif;
             font-weight: 500;
             transition: all 0.3s;
         }
@@ -667,6 +669,13 @@
             margin-top: 40px;
         }
 
+        #chat-section hr {
+            width: 50%;
+            margin: 40px auto;
+            border: 0;
+            border-top: 1px solid rgba(255, 0, 255, 0.2);
+        }
+
         /* Mobile Responsive */
         @media (max-width: 768px) {
             nav ul {
@@ -704,6 +713,10 @@
 
             #chat-section {
                 min-height: 50vh;
+            }
+
+            #chat-section hr {
+                width: 80%;
             }
         }
     </style>
@@ -754,10 +767,10 @@
                     <div class="video-caption">rooftop views in monaco 🌅✨</div>
                     <div class="video-actions">
                         <button class="video-action" onclick="event.stopPropagation(); toggleVideoLike(this)">
-                            <span>❤️</span> <span>234K</span>
+                            <img src="https://img.icons8.com/ios-filled/16/00FFFF/like.png" alt="Like"> <span>234K</span>
                         </button>
                         <button class="video-action" onclick="event.stopPropagation(); showExtendedView(1, 'video')">
-                            <span>💬</span> <span>1.2K</span>
+                            <img src="https://img.icons8.com/ios-filled/16/00FFFF/comments.png" alt="Comment"> <span>1.2K</span>
                         </button>
                     </div>
                 </div>
@@ -769,10 +782,10 @@
                     <div class="video-caption">unboxing my new collection</div>
                     <div class="video-actions">
                         <button class="video-action" onclick="event.stopPropagation(); toggleVideoLike(this)">
-                            <span>❤️</span> <span>189K</span>
+                            <img src="https://img.icons8.com/ios-filled/16/00FFFF/like.png" alt="Like"> <span>189K</span>
                         </button>
                         <button class="video-action" onclick="event.stopPropagation(); showExtendedView(2, 'video')">
-                            <span>💬</span> <span>892</span>
+                            <img src="https://img.icons8.com/ios-filled/16/00FFFF/comments.png" alt="Comment"> <span>892</span>
                         </button>
                     </div>
                 </div>
@@ -794,8 +807,8 @@
                     </div>
                     <p class="post-caption">Sometimes the best luxury is a quiet moment above the city. What does luxury mean to you? 💭</p>
                     <div class="post-actions">
-                        <button class="action-btn" onclick="event.stopPropagation(); togglePostLike(this)">❤️ Like</button>
-                        <button class="action-btn" onclick="event.stopPropagation(); showExtendedView(1, 'post')">💬 Comment</button>
+                        <button class="action-btn" onclick="event.stopPropagation(); togglePostLike(this)"><img src="https://img.icons8.com/ios-filled/16/00FFFF/like.png" alt="Like"> Like</button>
+                        <button class="action-btn" onclick="event.stopPropagation(); showExtendedView(1, 'post')"><img src="https://img.icons8.com/ios-filled/16/00FFFF/comments.png" alt="Comment"> Comment</button>
                     </div>
                 </div>
             </div>
@@ -808,8 +821,8 @@
                     </div>
                     <p class="post-caption">City lights and late nights. This view never gets old. 🏙️✨</p>
                     <div class="post-actions">
-                        <button class="action-btn" onclick="event.stopPropagation(); togglePostLike(this)">❤️ Like</button>
-                        <button class="action-btn" onclick="event.stopPropagation(); showExtendedView(2, 'post')">💬 Comment</button>
+                        <button class="action-btn" onclick="event.stopPropagation(); togglePostLike(this)"><img src="https://img.icons8.com/ios-filled/16/00FFFF/like.png" alt="Like"> Like</button>
+                        <button class="action-btn" onclick="event.stopPropagation(); showExtendedView(2, 'post')"><img src="https://img.icons8.com/ios-filled/16/00FFFF/comments.png" alt="Comment"> Comment</button>
                     </div>
                 </div>
             </div>
@@ -822,8 +835,8 @@
                     </div>
                     <p class="post-caption">New season, new wardrobe. Minimalism meets elegance. 🤍</p>
                     <div class="post-actions">
-                        <button class="action-btn" onclick="event.stopPropagation(); togglePostLike(this)">❤️ Like</button>
-                        <button class="action-btn" onclick="event.stopPropagation(); showExtendedView(3, 'post')">💬 Comment</button>
+                        <button class="action-btn" onclick="event.stopPropagation(); togglePostLike(this)"><img src="https://img.icons8.com/ios-filled/16/00FFFF/like.png" alt="Like"> Like</button>
+                        <button class="action-btn" onclick="event.stopPropagation(); showExtendedView(3, 'post')"><img src="https://img.icons8.com/ios-filled/16/00FFFF/comments.png" alt="Comment"> Comment</button>
                     </div>
                 </div>
             </div>
@@ -917,7 +930,8 @@
     <!-- Chat Section -->
     <section id="chat-section">
         <h2>Chat with Amaia!</h2>
-        <p style="color: rgba(255, 255, 255, 0.6); margin: 16px 0;">Interact with me directly through the widget below!</p>
+        <p style="color: rgba(255, 255, 255, 0.6); margin: 16px 0;">Engage with me directly via the widget in the bottom right corner!</p>
+        <hr>
         <elevenlabs-convai agent-id="agent_2401k7zqr76sejkt2xcszb3gqy9j"></elevenlabs-convai>
         <script src="https://unpkg.com/@elevenlabs/convai-widget-embed" async type="text/javascript"></script>
     </section>
@@ -955,9 +969,9 @@
         function togglePostLike(button) {
             button.classList.toggle('liked');
             if (button.classList.contains('liked')) {
-                button.textContent = '❤️ Liked';
+                button.textContent = '<img src="https://img.icons8.com/ios-filled/16/FF00FF/like.png" alt="Liked"> Liked';
             } else {
-                button.textContent = '❤️ Like';
+                button.textContent = '<img src="https://img.icons8.com/ios-filled/16/00FFFF/like.png" alt="Like"> Like';
             }
         }
 
@@ -1008,6 +1022,33 @@
                 { id: 6, emoji: '✈️', caption: 'private jet diaries', likes: '523K', comments: '4.8K' }
             ];
 
+            const videoComments = {
+                1: [
+                    { author: '@rooftop_fan', text: 'Amazing view from up there!', likes: 20, amaiaResponse: 'Thanks! The Monaco skyline is unreal. 🌆' },
+                    { author: '@sky_gazer', text: 'Wish I could see this live.', likes: 12, amaiaResponse: null }
+                ],
+                2: [
+                    { author: '@jewelry_lover', text: 'That collection is gorgeous!', likes: 15, amaiaResponse: null },
+                    { author: '@unboxer', text: 'Can’t wait to see more!', likes: 10, amaiaResponse: 'More to come soon! 💎' }
+                ],
+                3: [
+                    { author: '@cocktail_fan', text: 'Those drinks look amazing!', likes: 18, amaiaResponse: null },
+                    { author: '@sunset_chaser', text: 'Perfect evening vibe.', likes: 9, amaiaResponse: 'Glad you think so! 🍹' }
+                ],
+                4: [
+                    { author: '@paris_dreamer', text: 'Paris at its best!', likes: 14, amaiaResponse: null },
+                    { author: '@golden_hour', text: 'Stunning lighting.', likes: 8, amaiaResponse: null }
+                ],
+                5: [
+                    { author: '@fashion_week', text: 'Behind the scenes gold!', likes: 22, amaiaResponse: 'Thanks! Hard work pays off. 👗' },
+                    { author: '@style_icon', text: 'Incredible work!', likes: 13, amaiaResponse: null }
+                ],
+                6: [
+                    { author: '@jet_setter', text: 'Living the dream!', likes: 19, amaiaResponse: null },
+                    { author: '@travel_bug', text: 'Where to next?', likes: 11, amaiaResponse: 'Maybe Tokyo next! ✈️' }
+                ]
+            };
+
             container.innerHTML = videos.map(v => `
                 <div class="${view === 'tiktok' ? 'tiktok-video' : 'video-item'}" onclick="showExtendedView(${v.id}, 'video')">
                     <!-- Replace the video-placeholder with your video element here, e.g.: -->
@@ -1018,10 +1059,10 @@
                         <div class="video-caption">${v.caption}</div>
                         <div class="video-actions">
                             <button class="video-action" onclick="event.stopPropagation(); toggleVideoLike(this)">
-                                <span>❤️</span> <span>${v.likes}</span>
+                                <img src="https://img.icons8.com/ios-filled/16/00FFFF/like.png" alt="Like"> <span>${v.likes}</span>
                             </button>
                             <button class="video-action" onclick="event.stopPropagation(); showExtendedView(${v.id}, 'video')">
-                                <span>💬</span> <span>${v.comments}</span>
+                                <img src="https://img.icons8.com/ios-filled/16/00FFFF/comments.png" alt="Comment"> <span>${v.comments}</span>
                             </button>
                         </div>
                     </div>
@@ -1095,8 +1136,8 @@
                         </div>
                         <p class="post-caption">${p.caption}</p>
                         <div class="post-actions">
-                            <button class="action-btn" onclick="event.stopPropagation(); togglePostLike(this)">❤️ Like</button>
-                            <button class="action-btn" onclick="event.stopPropagation(); showExtendedView(${p.id}, 'post')">💬 Comment</button>
+                            <button class="action-btn" onclick="event.stopPropagation(); togglePostLike(this)"><img src="https://img.icons8.com/ios-filled/16/00FFFF/like.png" alt="Like"> Like</button>
+                            <button class="action-btn" onclick="event.stopPropagation(); showExtendedView(${p.id}, 'post')"><img src="https://img.icons8.com/ios-filled/16/00FFFF/comments.png" alt="Comment"> Comment</button>
                         </div>
                     </div>
                 </div>
@@ -1107,7 +1148,7 @@
         function populateJournal() {
             const container = document.getElementById('journalEntries');
             let journalEntries = JSON.parse(localStorage.getItem('journalEntries')) || [
-                { date: '23 October 2025', content: 'Today at 04:16 PM AEDT, I enjoyed a quiet moment reflecting on my journey. What’s your favorite way to unwind? 🌿' },
+                { date: '23 October 2025', content: 'Today at 04:29 PM AEDT, I enjoyed a quiet moment reflecting on my journey. What’s your favorite way to unwind? 🌿' },
                 { date: '22 October 2025', content: 'Last night’s city lights felt like a love letter to the world. I’m always inspired by the energy of a bustling city. What place makes your heart race? 🏙️' },
                 { date: '21 October 2025', content: 'Spent the day curating a new wardrobe. Less is more—choosing pieces that tell a story. What’s one item in your closet you can’t live without? 👗' }
             ];
@@ -1129,13 +1170,28 @@
                 localStorage.setItem('journalEntries', JSON.stringify(journalEntries));
             }
 
+            const journalComments = {
+                '23 October 2025': [
+                    { author: '@reflection_fan', text: 'Love your introspective side!', likes: 10, amaiaResponse: 'Thanks! It’s my quiet time. 🌿' },
+                    { author: '@thoughtful_one', text: 'Great question to ponder.', likes: 6, amaiaResponse: null }
+                ],
+                '22 October 2025': [
+                    { author: '@city_lover', text: 'City energy is unmatched!', likes: 12, amaiaResponse: null },
+                    { author: '@night_walker', text: 'Paris for me!', likes: 8, amaiaResponse: 'Paris is magical! 🏙️' }
+                ],
+                '21 October 2025': [
+                    { author: '@fashion_curator', text: 'Love the wardrobe focus!', likes: 14, amaiaResponse: null },
+                    { author: '@style_seeker', text: 'My favorite is my scarf.', likes: 7, amaiaResponse: null }
+                ]
+            };
+
             container.innerHTML = journalEntries.map(j => `
                 <div class="journal-entry">
                     <div class="journal-date">${j.date}</div>
                     <div class="journal-content">${j.content}</div>
                     <div class="journal-actions">
-                        <button class="action-btn" onclick="togglePostLike(this)">❤️ Like</button>
-                        <button class="action-btn" onclick="showExtendedView('${j.date}', 'journal')">💬 Comment</button>
+                        <button class="action-btn" onclick="togglePostLike(this)"><img src="https://img.icons8.com/ios-filled/16/00FFFF/like.png" alt="Like"> Like</button>
+                        <button class="action-btn" onclick="showExtendedView('${j.date}', 'journal')"><img src="https://img.icons8.com/ios-filled/16/00FFFF/comments.png" alt="Comment"> Comment</button>
                     </div>
                 </div>
             `).join('');
@@ -1235,8 +1291,20 @@
                 9: [
                     { author: '@memory_keeper', text: 'My favorite memory is with my dog! 📸', likes: 15, amaiaResponse: null },
                     { author: '@photo_fan', text: 'Beautiful shot!', likes: 10, amaiaResponse: null }
+                ],
+                '23 October 2025': [
+                    { author: '@reflection_fan', text: 'Love your introspective side!', likes: 10, amaiaResponse: 'Thanks! It’s my quiet time. 🌿' },
+                    { author: '@thoughtful_one', text: 'Great question to ponder.', likes: 6, amaiaResponse: null }
+                ],
+                '22 October 2025': [
+                    { author: '@city_lover', text: 'City energy is unmatched!', likes: 12, amaiaResponse: null },
+                    { author: '@night_walker', text: 'Paris for me!', likes: 8, amaiaResponse: 'Paris is magical! 🏙️' }
+                ],
+                '21 October 2025': [
+                    { author: '@fashion_curator', text: 'Love the wardrobe focus!', likes: 14, amaiaResponse: null },
+                    { author: '@style_seeker', text: 'My favorite is my scarf.', likes: 7, amaiaResponse: null }
                 ]
-            }[type === 'post' ? id : 'journal'];
+            }[type === 'post' ? id : type === 'video' ? id : id];
 
             // Load user comments from localStorage
             const userComments = JSON.parse(localStorage.getItem(`comments_${type}_${type === 'journal' ? `'${id}'` : id}`)) || [];
@@ -1247,7 +1315,7 @@
                     <div class="comment-author">${c.author}</div>
                     <div class="comment-text">${c.text}</div>
                     <div class="comment-likes" onclick="toggleCommentLike(this, '${type}', ${type === 'journal' ? `'${id}'` : id}, '${c.text}')">
-                        <span>❤️</span> <span>${c.likes || 0}</span>
+                        <img src="https://img.icons8.com/ios-filled/16/00FFFF/like.png" alt="Like"> <span>${c.likes || 0}</span>
                     </div>
                     ${c.amaiaResponse ? `
                         <div class="comment" style="margin-left: 20px; border-left: 2px solid #FF00FF;">
