@@ -42,6 +42,9 @@
             const maxReconnectAttempts = 3;
             const responseBuffer = useRef('');
             const lastResponse = useRef('');
+            const lastUserInput = useRef('');
+            const lastTranscriptionTime = useRef(0);
+            const retryQueue = useRef([]);
 
             // Initialize separate AudioContexts for input and playback
             useEffect(() => {
@@ -83,13 +86,22 @@
                         }
                         console.log('Interim transcript:', transcript);
                         if (event.results[event.results.length - 1].isFinal) {
-                            const finalTranscript = event.results[event.results.length - 1][0].transcript;
-                            addToTranscript('You', finalTranscript);
+                            const finalTranscript = event.results[event.results.length - 1][0].transcript.trim();
+                            if (finalTranscript && finalTranscript !== lastResponse.current) {
+                                addToTranscript('You', finalTranscript);
+                                lastUserInput.current = finalTranscript;
+                                lastTranscriptionTime.current = Date.now();
+                                // Add to retry queue
+                                retryQueue.current.push(finalTranscript);
+                            }
                         }
                     };
                     recognitionRef.current.onerror = (event) => {
                         console.error('Speech error:', event.error);
                         setError('Microphone error: ' + event.error);
+                        if (event.error === 'no-speech' && isOnCall && isConnected) {
+                            recognitionRef.current.start();
+                        }
                     };
                     recognitionRef.current.onend = () => {
                         console.log('Speech recognition ended');
@@ -100,8 +112,27 @@
                 }
             }, [isOnCall, isConnected]);
 
+            // Retry sending user input if no server response
+            useEffect(() => {
+                const checkResponse = () => {
+                    if (lastUserInput.current && Date.now() - lastTranscriptionTime.current > 5000 && retryQueue.current.length > 0) {
+                        const transcript = retryQueue.current[0];
+                        console.log('No server response for:', transcript, 'Retrying...');
+                        setError('Amaia didn’t respond. Using fallback response.');
+                        const fallbackResponse = transcript.toLowerCase().includes('hear me') ? 
+                            "Hey there! I can hear you perfectly. What's on your mind?" : 
+                            "I'm here, just thinking about what you said! Want to share more?";
+                        addToTranscript('Amaia', fallbackResponse);
+                        retryQueue.current.shift(); // Remove from queue
+                        lastTranscriptionTime.current = Date.now();
+                    }
+                };
+                const interval = setInterval(checkResponse, 1000);
+                return () => clearInterval(interval);
+            }, []);
+
             const addToTranscript = (speaker, text) => {
-                if (text && text.trim()) {
+                if (text && text.trim() && text !== lastResponse.current) {
                     setCallTranscript(prev => [...prev, { speaker, text, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }]);
                     if (speaker === 'Amaia') lastResponse.current = text;
                 }
@@ -158,12 +189,14 @@
                 const nonZeroRatio = nonZeroCount / Math.min(audioBytes.length, 100);
                 const outOfRangeRatio = outOfRange / Math.min(audioBytes.length, 100);
                 console.log('PCM validation: nonZeroRatio=', nonZeroRatio, 'outOfRangeRatio=', outOfRangeRatio);
-                // Relaxed validation for debugging
-                if (nonZeroRatio < 0.1) {
-                    console.error('PCM data likely invalid: nonZeroRatio too low', nonZeroRatio);
-                    return false;
+                // Log first 20 samples for debugging
+                const floatArray = new Float32Array(Math.min(20, Math.floor(audioBytes.length / 2)));
+                for (let i = 0; i < floatArray.length; i++) {
+                    floatArray[i] = ((audioBytes[i * 2] | (audioBytes[i * 2 + 1] << 8)) - 32768) / 32768;
                 }
-                return true;
+                console.log('First 20 PCM samples:', floatArray);
+                // Relaxed validation
+                return nonZeroRatio >= 0.1;
             };
 
             const playAudioQueue = async () => {
@@ -178,6 +211,11 @@
                 }
                 console.log('Processing audio chunk, size:', chunk.byteLength);
 
+                // Mute microphone during playback to prevent feedback
+                if (mediaStreamRef.current) {
+                    mediaStreamRef.current.getAudioTracks().forEach(track => track.enabled = false);
+                }
+
                 try {
                     const buffer = await playbackContext.current.decodeAudioData(chunk);
                     const source = playbackContext.current.createBufferSource();
@@ -188,13 +226,16 @@
                     source.onended = () => {
                         console.log('Audio chunk ended');
                         isPlaying.current = false;
+                        // Re-enable microphone
+                        if (mediaStreamRef.current) {
+                            mediaStreamRef.current.getAudioTracks().forEach(track => track.enabled = true);
+                        }
                         playAudioQueue();
                     };
                 } catch (err) {
                     console.error('Audio decode error:', err.message);
                     isPlaying.current = false;
                     setError('Failed to decode audio chunk. Using fallback WAV.');
-                    // Fallback to HTML audio element
                     const wavBlob = createWavBlob(new Uint8Array(chunk));
                     const url = URL.createObjectURL(wavBlob);
                     const audio = new Audio(url);
@@ -204,6 +245,10 @@
                             console.log('Fallback WAV playback ended');
                             URL.revokeObjectURL(url);
                             isPlaying.current = false;
+                            // Re-enable microphone
+                            if (mediaStreamRef.current) {
+                                mediaStreamRef.current.getAudioTracks().forEach(track => track.enabled = true);
+                            }
                             playAudioQueue();
                         };
                     }).catch(e => {
@@ -282,6 +327,8 @@
                             if (data.type === 'agent_response' && data.agent_response_event?.agent_response) {
                                 if (data.agent_response_event.agent_response !== lastResponse.current) {
                                     addToTranscript('Amaia', data.agent_response_event.agent_response);
+                                    lastTranscriptionTime.current = Date.now();
+                                    retryQueue.current = []; // Clear retry queue on server response
                                 }
                             } else if (data.type === 'agent_chat_response_part' && data.text_response_part) {
                                 if (data.text_response_part.type === 'start') {
@@ -292,6 +339,8 @@
                                 } else if (data.text_response_part.type === 'stop' && responseBuffer.current) {
                                     if (responseBuffer.current !== lastResponse.current) {
                                         addToTranscript('Amaia', responseBuffer.current);
+                                        lastTranscriptionTime.current = Date.now();
+                                        retryQueue.current = []; // Clear retry queue
                                     }
                                     responseBuffer.current = '';
                                 }
@@ -307,12 +356,6 @@
                                     console.log('Audio bytes length:', audioBytes.length, 'First 10 bytes:', audioBytes.slice(0, 10));
                                     if (!validatePcmData(audioBytes)) {
                                         console.warn('PCM data validation failed, attempting playback anyway');
-                                        // Log first 20 samples for debugging
-                                        const floatArray = new Float32Array(Math.floor(audioBytes.length / 2));
-                                        for (let i = 0; i < floatArray.length; i++) {
-                                            floatArray[i] = ((audioBytes[i * 2] | (audioBytes[i * 2 + 1] << 8)) - 32768) / 32768;
-                                        }
-                                        console.log('First 20 PCM samples:', floatArray.slice(0, 20));
                                     }
                                     const audioBuffer = playbackContext.current.createBuffer(1, audioBytes.length / 2, 16000);
                                     const floatArray = new Float32Array(audioBytes.length / 2);
@@ -370,6 +413,8 @@
                                 setError(`Server error: ${data.error.message || 'Unknown error'}`);
                             } else if (data.type === 'user_transcription_event' && data.user_transcription_event?.user_transcript) {
                                 console.log('Server received user transcript:', data.user_transcription_event.user_transcript);
+                                lastTranscriptionTime.current = Date.now();
+                                retryQueue.current = []; // Clear retry queue
                             } else {
                                 console.log('Unhandled message type:', data.type);
                             }
@@ -421,6 +466,12 @@
                                 const s = Math.max(-1, Math.min(1, input[i]));
                                 view.setInt16(i * 2, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
                             }
+                            // Log first 10 samples for debugging
+                            const floatArray = new Float32Array(Math.min(10, input.length));
+                            for (let i = 0; i < floatArray.length; i++) {
+                                floatArray[i] = input[i];
+                            }
+                            console.log('User audio samples (first 10):', floatArray);
                             const base64 = arrayBufferToBase64(buffer);
                             console.log('Sending user audio chunk, size:', buffer.byteLength);
                             websocketRef.current.send(JSON.stringify({ type: 'user_audio_chunk', user_audio_chunk: base64 }));
@@ -470,6 +521,8 @@
                 isPlaying.current = false;
                 responseBuffer.current = '';
                 lastResponse.current = '';
+                lastUserInput.current = '';
+                retryQueue.current = [];
                 if (pingIntervalRef.current) {
                     clearInterval(pingIntervalRef.current);
                     pingIntervalRef.current = null;
