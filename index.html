@@ -1323,8 +1323,9 @@
         function populateJournal() {
             const container = document.getElementById('journalEntries');
             let journalEntries = JSON.parse(localStorage.getItem('journalEntries')) || [
-                { date: '22 October 2025', content: 'Last night’s city lights felt like a love letter to the world. I’m always inspired by the energy of a bustling city. What place makes your heart race? 🏙️' },
-                { date: '21 October 2025', content: 'Spent the day curating a new wardrobe. Less is more—choosing pieces that tell a story. What’s one item in your closet you can’t live without? 👗' }
+                { date: '24 October 2025', content: 'At 12:18 AM AEDT today, I savored a peaceful night under the stars, dreaming of new horizons. What inspires you late at night? 🌌' },
+                { date: '23 October 2025', content: 'Today I enjoyed a quiet moment reflecting on my journey. What’s your favorite way to unwind? 🌿' },
+                { date: '22 October 2025', content: 'Last night’s city lights felt like a love letter to the world. I’m always inspired by the energy of a bustling city. What place makes your heart race? 🏙️' }
             ];
 
             // Add new entry if it's a new day
@@ -1333,29 +1334,29 @@
             if (!lastDate || lastDate !== today) {
                 const newEntry = {
                     date: today,
-                    content: `Today I enjoyed a quiet moment reflecting on my journey. What’s your favorite way to unwind? 🌿`
+                    content: `At 12:18 AM AEDT today, I savored a peaceful night under the stars, dreaming of new horizons. What inspires you late at night? 🌌`
                 };
                 journalEntries.unshift(newEntry);
                 localStorage.setItem('journalEntries', JSON.stringify(journalEntries));
                 localStorage.setItem('lastJournalDate', today);
             } else {
                 // Update existing entry with current content if it's the same day
-                journalEntries[0].content = `Today I enjoyed a quiet moment reflecting on my journey. What’s your favorite way to unwind? 🌿`;
+                journalEntries[0].content = `At 12:18 AM AEDT today, I savored a peaceful night under the stars, dreaming of new horizons. What inspires you late at night? 🌌`;
                 localStorage.setItem('journalEntries', JSON.stringify(journalEntries));
             }
 
             const journalComments = {
+                '24 October 2025': [
+                    { author: '@night_dreamer', text: 'The stars are magical tonight!', likes: 10, amaiaResponse: 'Absolutely, they guide my thoughts! 🌟' },
+                    { author: '@late_thinker', text: 'Late nights fuel my creativity.', likes: 6, amaiaResponse: null }
+                ],
+                '23 October 2025': [
+                    { author: '@reflection_fan', text: 'Love your introspective side!', likes: 10, amaiaResponse: 'Thanks! It’s my quiet time. 🌿' },
+                    { author: '@thoughtful_one', text: 'Great question to ponder.', likes: 6, amaiaResponse: null }
+                ],
                 '22 October 2025': [
                     { author: '@city_lover', text: 'City energy is unmatched!', likes: 12, amaiaResponse: null },
                     { author: '@night_walker', text: 'Paris for me!', likes: 8, amaiaResponse: 'Paris is magical! 🏙️' }
-                ],
-                '21 October 2025': [
-                    { author: '@fashion_curator', text: 'Love the wardrobe focus!', likes: 14, amaiaResponse: null },
-                    { author: '@style_seeker', text: 'My favorite is my scarf.', likes: 7, amaiaResponse: null }
-                ],
-                [today]: [
-                    { author: '@reflection_fan', text: 'Love your introspective side!', likes: 10, amaiaResponse: 'Thanks! It’s my quiet time. 🌿' },
-                    { author: '@thoughtful_one', text: 'Great question to ponder.', likes: 6, amaiaResponse: null }
                 ]
             };
 
@@ -1469,17 +1470,17 @@
                     { author: '@memory_keeper', text: 'My favorite memory is with my dog! 📸', likes: 15, amaiaResponse: null },
                     { author: '@photo_fan', text: 'Beautiful shot!', likes: 10, amaiaResponse: null }
                 ],
+                '24 October 2025': [
+                    { author: '@night_dreamer', text: 'The stars are magical tonight!', likes: 10, amaiaResponse: 'Absolutely, they guide my thoughts! 🌟' },
+                    { author: '@late_thinker', text: 'Late nights fuel my creativity.', likes: 6, amaiaResponse: null }
+                ],
+                '23 October 2025': [
+                    { author: '@reflection_fan', text: 'Love your introspective side!', likes: 10, amaiaResponse: 'Thanks! It’s my quiet time. 🌿' },
+                    { author: '@thoughtful_one', text: 'Great question to ponder.', likes: 6, amaiaResponse: null }
+                ],
                 '22 October 2025': [
                     { author: '@city_lover', text: 'City energy is unmatched!', likes: 12, amaiaResponse: null },
                     { author: '@night_walker', text: 'Paris for me!', likes: 8, amaiaResponse: 'Paris is magical! 🏙️' }
-                ],
-                '21 October 2025': [
-                    { author: '@fashion_curator', text: 'Love the wardrobe focus!', likes: 14, amaiaResponse: null },
-                    { author: '@style_seeker', text: 'My favorite is my scarf.', likes: 7, amaiaResponse: null }
-                ],
-                [new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })]: [
-                    { author: '@reflection_fan', text: 'Love your introspective side!', likes: 10, amaiaResponse: 'Thanks! It’s my quiet time. 🌿' },
-                    { author: '@thoughtful_one', text: 'Great question to ponder.', likes: 6, amaiaResponse: null }
                 ]
             }[type === 'post' ? id : type === 'video' ? id : id];
 
@@ -1532,7 +1533,7 @@
             const input = document.getElementById('commentInput');
             const type = input.dataset.type;
             const id = input.dataset.id;
-            const text = input.value.trim();
+            const text = input.value.trim
             if (!text) return;
 
             const userComments = JSON.parse(localStorage.getItem(`comments_${type}_${id}`)) || [];
