@@ -820,7 +820,7 @@
                 ],
                 ['24 October 2025']: [
                     { author: '@stargazer', text: 'Love the starry night vibe!', likes: 10, amaiaResponse: 'Thanks! The stars are so inspiring. 🌌' },
-                    { author: '@dreamer', text: 'This makes me want to stargaze too!', likes: 6, amaiaResponse: null }
+                    { author: '@dreamer', text: 'Honestly, just good music and random late-night thoughts, everything feels deeper after midnight haha.', likes: 6, amaiaResponse: null }
                 ]
             }[type === 'post' ? id : type === 'video' ? id : id];
             const userComments = JSON.parse(localStorage.getItem(`comments_${type}_${type === 'journal' ? `'${id}'` : id}`)) || [];
