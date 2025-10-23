@@ -1323,9 +1323,10 @@
         function populateJournal() {
             const container = document.getElementById('journalEntries');
             let journalEntries = JSON.parse(localStorage.getItem('journalEntries')) || [
-                { date: '24 October 2025', content: 'At 12:18 AM AEDT today, I savored a peaceful night under the stars, dreaming of new horizons. What inspires you late at night? 🌌' },
+                { date: '24 October 2025', content: 'Today, I savored a peaceful night under the stars, dreaming of new horizons. What inspires you late at night? 🌌' },
                 { date: '23 October 2025', content: 'Today I enjoyed a quiet moment reflecting on my journey. What’s your favorite way to unwind? 🌿' },
-                { date: '22 October 2025', content: 'Last night’s city lights felt like a love letter to the world. I’m always inspired by the energy of a bustling city. What place makes your heart race? 🏙️' }
+                { date: '22 October 2025', content: 'Last night’s city lights felt like a love letter to the world. I’m always inspired by the energy of a bustling city. What place makes your heart race? 🏙️' },
+                { date: '21 October 2025', content: 'Spent the day curating a new wardrobe. Less is more—choosing pieces that tell a story. What’s one item in your closet you can’t live without? 👗' }
             ];
 
             // Add new entry if it's a new day
@@ -1334,14 +1335,14 @@
             if (!lastDate || lastDate !== today) {
                 const newEntry = {
                     date: today,
-                    content: `At 12:18 AM AEDT today, I savored a peaceful night under the stars, dreaming of new horizons. What inspires you late at night? 🌌`
+                    content: `Today, I savored a peaceful night under the stars, dreaming of new horizons. What inspires you late at night? 🌌`
                 };
                 journalEntries.unshift(newEntry);
                 localStorage.setItem('journalEntries', JSON.stringify(journalEntries));
                 localStorage.setItem('lastJournalDate', today);
             } else {
                 // Update existing entry with current content if it's the same day
-                journalEntries[0].content = `At 12:18 AM AEDT today, I savored a peaceful night under the stars, dreaming of new horizons. What inspires you late at night? 🌌`;
+                journalEntries[0].content = `Today, I savored a peaceful night under the stars, dreaming of new horizons. What inspires you late at night? 🌌`;
                 localStorage.setItem('journalEntries', JSON.stringify(journalEntries));
             }
 
@@ -1357,6 +1358,10 @@
                 '22 October 2025': [
                     { author: '@city_lover', text: 'City energy is unmatched!', likes: 12, amaiaResponse: null },
                     { author: '@night_walker', text: 'Paris for me!', likes: 8, amaiaResponse: 'Paris is magical! 🏙️' }
+                ],
+                '21 October 2025': [
+                    { author: '@fashion_fan', text: 'Love a good wardrobe update!', likes: 11, amaiaResponse: null },
+                    { author: '@style_queen', text: 'My favorite item is my leather jacket.', likes: 7, amaiaResponse: 'Great choice! Leather has timeless appeal. 👗' }
                 ]
             };
 
@@ -1481,6 +1486,10 @@
                 '22 October 2025': [
                     { author: '@city_lover', text: 'City energy is unmatched!', likes: 12, amaiaResponse: null },
                     { author: '@night_walker', text: 'Paris for me!', likes: 8, amaiaResponse: 'Paris is magical! 🏙️' }
+                ],
+                '21 October 2025': [
+                    { author: '@fashion_fan', text: 'Love a good wardrobe update!', likes: 11, amaiaResponse: null },
+                    { author: '@style_queen', text: 'My favorite item is my leather jacket.', likes: 7, amaiaResponse: 'Great choice! Leather has timeless appeal. 👗' }
                 ]
             }[type === 'post' ? id : type === 'video' ? id : id];
 
