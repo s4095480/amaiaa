@@ -3,631 +3,616 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Amaia - AI Voice Chat</title>
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎤</text></svg>">
+    <title>Amaia Voss - AI Celebrity</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;400;600;700&family=Rubik:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>✨</text></svg>">
     <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #000; color: #fff; }
-        .animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
-    </style>
-</head>
-<body>
-    <div id="root"></div>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-    <script type="text/babel">
-        const { useState, useRef, useEffect } = React;
+        body {
+            font-family: 'Rubik', sans-serif;
+            background: #0A0F1C;
+            color: #FFFFFF;
+            overflow-x: hidden;
+        }
 
-        function AmaiaPlatform() {
-            const [currentPage, setCurrentPage] = useState('intro');
-            const [isOnCall, setIsOnCall] = useState(false);
-            const [isConnected, setIsConnected] = useState(false);
-            const [status, setStatus] = useState('Amaia is online');
-            const [callTranscript, setCallTranscript] = useState([]);
-            const [error, setError] = useState(null);
-            const [audioAllowed, setAudioAllowed] = useState(false);
-            const websocketRef = useRef(null);
-            const audioContext = useRef(null);
-            const playbackContext = useRef(null);
-            const scriptProcessorRef = useRef(null);
-            const mediaStreamRef = useRef(null);
-            const audioQueue = useRef([]);
-            const isPlaying = useRef(false);
-            const recognitionRef = useRef(null);
-            const pingIntervalRef = useRef(null);
-            const reconnectAttempts = useRef(0);
-            const maxReconnectAttempts = 3;
-            const responseBuffer = useRef('');
-            const lastResponse = useRef('');
-            const lastUserInput = useRef('');
-            const lastTranscriptionTime = useRef(0);
-            const retryQueue = useRef([]);
-            const amaiaGreeting = useRef('Hey it\'s Amaia! I\'m here with you. What would you like to share?');
+        h1, h2, h3, h4, h5, h6 {
+            font-family: 'Exo 2', sans-serif;
+        }
 
-            // Initialize AudioContexts
-            useEffect(() => {
-                audioContext.current = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
-                playbackContext.current = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
-                const unlockAudio = () => {
-                    Promise.all([
-                        audioContext.current.resume(),
-                        playbackContext.current.resume()
-                    ]).then(() => {
-                        console.log('Audio contexts unlocked');
-                        setAudioAllowed(true);
-                    }).catch(e => {
-                        console.error('Audio unlock error:', e);
-                        setError('Audio permission blocked. Click to enable.');
-                    });
-                };
-                document.addEventListener('click', unlockAudio);
-                document.addEventListener('touchstart', unlockAudio);
-                return () => {
-                    document.removeEventListener('click', unlockAudio);
-                    document.removeEventListener('touchstart', unlockAudio);
-                };
-            }, []);
+        /* Navigation */
+        nav {
+            position: fixed;
+            top: 0;
+            width: 100%;
+            background: rgba(10, 15, 28, 0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(255, 0, 255, 0.2);
+            z-index: 1000;
+        }
 
-            // Local speech recognition
-            useEffect(() => {
-                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-                if (SpeechRecognition) {
-                    recognitionRef.current = new SpeechRecognition();
-                    recognitionRef.current.continuous = true;
-                    recognitionRef.current.interimResults = true;
-                    recognitionRef.current.lang = 'en-US';
+        nav .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 70px;
+        }
 
-                    recognitionRef.current.onresult = (event) => {
-                        let transcript = '';
-                        for (let i = event.resultIndex; i < event.results.length; i++) {
-                            transcript += event.results[i][0].transcript + ' ';
-                        }
-                        console.log('Interim transcript:', transcript);
-                        if (event.results[event.results.length - 1].isFinal) {
-                            const finalTranscript = event.results[event.results.length - 1][0].transcript.trim();
-                            // Filter out Amaia's greeting
-                            if (finalTranscript && finalTranscript !== lastResponse.current && 
-                                !finalTranscript.toLowerCase().includes(amaiaGreeting.current.toLowerCase().slice(0, 20))) {
-                                addToTranscript('You', finalTranscript);
-                                lastUserInput.current = finalTranscript;
-                                lastTranscriptionTime.current = Date.now();
-                                retryQueue.current.push(finalTranscript);
-                            }
-                        }
-                    };
-                    recognitionRef.current.onerror = (event) => {
-                        console.error('Speech error:', event.error);
-                        setError('Microphone error: ' + event.error);
-                        if (event.error === 'no-speech' && isOnCall && isConnected) {
-                            recognitionRef.current.start();
-                        }
-                    };
-                    recognitionRef.current.onend = () => {
-                        console.log('Speech recognition ended');
-                        if (isOnCall && isConnected) recognitionRef.current.start();
-                    };
-                } else {
-                    setError('Speech recognition not supported.');
-                }
-            }, [isOnCall, isConnected]);
+        nav .logo {
+            font-family: 'Exo 2', sans-serif;
+            font-size: 24px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #FF00FF, #00FFFF);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: 2px;
+        }
 
-            // Retry sending user input
-            useEffect(() => {
-                const checkResponse = () => {
-                    if (lastUserInput.current && Date.now() - lastTranscriptionTime.current > 5000 && retryQueue.current.length > 0) {
-                        const transcript = retryQueue.current[0];
-                        console.log('No server response for:', transcript, 'Retrying...');
-                        setError('Amaia didn’t respond. Using fallback response.');
-                        let fallbackResponse;
-                        if (transcript.toLowerCase().includes('hear me')) {
-                            fallbackResponse = "Hey there! I can hear you perfectly. What's on your mind?";
-                        } else if (transcript.toLowerCase().includes('how are you')) {
-                            fallbackResponse = "I'm doing great, thanks for asking! How about you?";
-                        } else if (transcript.toLowerCase().includes('yourself')) {
-                            fallbackResponse = "I'm Amaia, your friendly AI companion, built to chat and help out. Tell me more about you!";
-                        } else {
-                            fallbackResponse = "I'm here, just thinking about what you said! Want to share more?";
-                        }
-                        addToTranscript('Amaia', fallbackResponse);
-                        retryQueue.current.shift();
-                        lastTranscriptionTime.current = Date.now();
-                    }
-                };
-                const interval = setInterval(checkResponse, 1000);
-                return () => clearInterval(interval);
-            }, []);
+        nav ul {
+            display: flex;
+            gap: 32px;
+            list-style: none;
+        }
 
-            const addToTranscript = (speaker, text) => {
-                if (text && text.trim() && text !== lastResponse.current) {
-                    setCallTranscript(prev => [...prev, { speaker, text, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }]);
-                    if (speaker === 'Amaia') lastResponse.current = text;
-                }
-            };
+        nav a {
+            color: #FFFFFF;
+            text-decoration: none;
+            font-weight: 500;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            transition: all 0.3s;
+        }
 
-            const createWavBlob = (pcmData) => {
-                const sampleRate = 16000;
-                const numChannels = 1;
-                const bitsPerSample = 16;
-                const byteRate = sampleRate * numChannels * bitsPerSample / 8;
-                const blockAlign = numChannels * bitsPerSample / 8;
-                const dataSize = pcmData.length;
-                const buffer = new ArrayBuffer(44 + dataSize);
-                const view = new DataView(buffer);
+        nav a:hover {
+            color: #FF00FF;
+        }
 
-                view.setUint32(0, 0x52494646, false); // "RIFF"
-                view.setUint32(4, 36 + dataSize, true);
-                view.setUint32(8, 0x57415645, false); // "WAVE"
-                view.setUint32(12, 0x666d7420, false); // "fmt "
-                view.setUint32(16, 16, true);
-                view.setUint16(20, 1, true); // PCM
-                view.setUint16(22, numChannels, true);
-                view.setUint32(24, sampleRate, true);
-                view.setUint32(28, byteRate, true);
-                view.setUint16(32, blockAlign, true);
-                view.setUint16(34, bitsPerSample, true);
-                view.setUint32(36, 0x64617461, false); // "data"
-                view.setUint32(40, dataSize, true);
+        /* Hero Section */
+        #home {
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+            overflow: hidden;
+            padding-top: 70px;
+        }
 
-                for (let i = 0; i < pcmData.length; i++) {
-                    view.setUint8(44 + i, pcmData[i]);
-                }
-                return new Blob([view], { type: 'audio/wav' });
-            };
+        #home::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: 
+                radial-gradient(circle at 20% 50%, rgba(255, 0, 255, 0.15), transparent 50%),
+                radial-gradient(circle at 80% 50%, rgba(0, 255, 255, 0.15), transparent 50%);
+        }
 
-            const validatePcmData = (audioBytes) => {
-                if (audioBytes.length < 2 || audioBytes.length % 2 !== 0) {
-                    console.error('PCM data invalid: length must be even, got', audioBytes.length);
-                    return false;
-                }
-                let nonZeroCount = 0;
-                let outOfRange = 0;
-                for (let i = 0; i < Math.min(audioBytes.length, 100); i++) {
-                    if (audioBytes[i] !== 0 && audioBytes[i] !== 255) nonZeroCount++;
-                    if (audioBytes[i] < 10 || audioBytes[i] > 245) outOfRange++;
-                }
-                const nonZeroRatio = nonZeroCount / Math.min(audioBytes.length, 100);
-                const outOfRangeRatio = outOfRange / Math.min(audioBytes.length, 100);
-                console.log('PCM validation: nonZeroRatio=', nonZeroRatio, 'outOfRangeRatio=', outOfRangeRatio);
-                const floatArray = new Float32Array(Math.min(20, Math.floor(audioBytes.length / 2)));
-                for (let i = 0; i < floatArray.length; i++) {
-                    floatArray[i] = ((audioBytes[i * 2] | (audioBytes[i * 2 + 1] << 8)) - 32768) / 32768;
-                }
-                console.log('First 20 PCM samples:', floatArray);
-                return nonZeroRatio >= 0.1;
-            };
+        .hero-content {
+            position: relative;
+            text-align: center;
+            z-index: 1;
+        }
 
-            const playAudioQueue = async () => {
-                if (isPlaying.current || audioQueue.current.length === 0) return;
-                isPlaying.current = true;
-                const chunk = audioQueue.current.shift();
-                if (!chunk) {
-                    console.error('Audio chunk is undefined');
-                    isPlaying.current = false;
-                    playAudioQueue();
-                    return;
-                }
-                console.log('Processing audio chunk, size:', chunk.byteLength);
+        .hero-image {
+            width: 200px;
+            height: 200px;
+            margin: 0 auto 32px;
+            background: linear-gradient(135deg, #FF00FF, #7B2CBF, #00FFFF);
+            border-radius: 50%;
+            box-shadow: 0 0 80px rgba(255, 0, 255, 0.6);
+            animation: float 6s ease-in-out infinite;
+        }
 
-                // Mute microphone and stop speech recognition
-                if (mediaStreamRef.current) {
-                    mediaStreamRef.current.getAudioTracks().forEach(track => track.enabled = false);
-                }
-                if (recognitionRef.current) {
-                    recognitionRef.current.stop();
-                }
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-20px); }
+        }
 
-                try {
-                    const buffer = await playbackContext.current.decodeAudioData(chunk);
-                    const source = playbackContext.current.createBufferSource();
-                    source.buffer = buffer;
-                    source.connect(playbackContext.current.destination);
-                    source.start();
-                    console.log('Audio playback started');
-                    source.onended = () => {
-                        console.log('Audio chunk ended');
-                        isPlaying.current = false;
-                        if (mediaStreamRef.current) {
-                            mediaStreamRef.current.getAudioTracks().forEach(track => track.enabled = true);
-                        }
-                        if (recognitionRef.current && isOnCall && isConnected) {
-                            recognitionRef.current.start();
-                        }
-                        playAudioQueue();
-                    };
-                } catch (err) {
-                    console.error('Audio decode error:', err.message);
-                    isPlaying.current = false;
-                    setError('Failed to decode audio chunk. Using fallback WAV.');
-                    const wavBlob = createWavBlob(new Uint8Array(chunk));
-                    const url = URL.createObjectURL(wavBlob);
-                    const audio = new Audio(url);
-                    audio.play().then(() => {
-                        console.log('Fallback WAV playback started');
-                        audio.onended = () => {
-                            console.log('Fallback WAV playback ended');
-                            URL.revokeObjectURL(url);
-                            isPlaying.current = false;
-                            if (mediaStreamRef.current) {
-                                mediaStreamRef.current.getAudioTracks().forEach(track => track.enabled = true);
-                            }
-                            if (recognitionRef.current && isOnCall && isConnected) {
-                                recognitionRef.current.start();
-                            }
-                            playAudioQueue();
-                        };
-                    }).catch(e => {
-                        console.error('Fallback playback error:', e);
-                        setError('Failed to play audio.');
-                        isPlaying.current = false;
-                        playAudioQueue();
-                    });
-                }
-            };
+        .hero-content h1 {
+            font-size: 72px;
+            font-weight: 700;
+            background: linear-gradient(135deg, #FF00FF, #FF77E9, #00FFFF);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 16px;
+            letter-spacing: 3px;
+        }
 
-            const getSignedUrl = async () => {
-                try {
-                    console.log('Fetching signed URL...');
-                    const response = await fetch('/api/signed-url');
-                    if (!response.ok) throw new Error(`Failed to get signed URL: ${response.status}`);
-                    const data = await response.json();
-                    console.log('Signed URL received:', data.signedUrl.slice(0, 50) + '...');
-                    return data.signedUrl;
-                } catch (error) {
-                    console.error('Signed URL error:', error);
-                    setError('Failed to connect to Amaia. Check console.');
-                    return null;
-                }
-            };
+        .hero-content p {
+            font-size: 20px;
+            color: #00FFFF;
+            margin-bottom: 48px;
+            font-weight: 300;
+        }
 
-            const startCall = async () => {
-                setIsOnCall(true);
-                setCurrentPage('call');
-                setStatus('Connecting to Amaia...');
-                setCallTranscript([{
-                    speaker: 'Amaia',
-                    text: amaiaGreeting.current,
-                    time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                }]);
-                lastResponse.current = amaiaGreeting.current;
-                reconnectAttempts.current = 0;
-                connectWebSocket();
-            };
+        .cta-button {
+            padding: 16px 48px;
+            background: linear-gradient(135deg, #FF00FF, #7B2CBF);
+            border: none;
+            border-radius: 50px;
+            color: #FFFFFF;
+            font-weight: 600;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            box-shadow: 0 4px 20px rgba(255, 0, 255, 0.4);
+        }
 
-            const connectWebSocket = async () => {
-                if (reconnectAttempts.current >= maxReconnectAttempts) {
-                    setError('Max reconnect attempts reached. Please try again.');
-                    setStatus('Disconnected');
-                    return;
-                }
+        .cta-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 30px rgba(255, 0, 255, 0.6);
+        }
 
-                const signedUrl = await getSignedUrl();
-                if (!signedUrl) return;
+        /* Sections */
+        section {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 100px 24px;
+            min-height: 100vh;
+        }
 
-                console.log('Connecting to WebSocket:', signedUrl);
-                websocketRef.current = new WebSocket(signedUrl);
+        section h2 {
+            font-size: 48px;
+            font-weight: 700;
+            margin-bottom: 48px;
+            text-align: center;
+            background: linear-gradient(135deg, #FF00FF, #00FFFF);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
 
-                websocketRef.current.onopen = () => {
-                    console.log('WebSocket connected');
-                    setIsConnected(true);
-                    setStatus('Connected! Speak to Amaia.');
-                    reconnectAttempts.current = 0;
-                    websocketRef.current.send(JSON.stringify({ type: 'conversation_initiation_client_data' }));
-                    startMicrophone();
-                    pingIntervalRef.current = setInterval(() => {
-                        if (websocketRef.current && websocketRef.current.readyState === WebSocket.OPEN) {
-                            console.log('Sending ping');
-                            websocketRef.current.send(JSON.stringify({ type: 'ping' }));
-                        }
-                    }, 3000);
-                };
+        /* TikTok Style Feed */
+        .tiktok-feed {
+            display: flex;
+            flex-direction: column;
+            gap: 32px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
 
-                websocketRef.current.onmessage = (event) => {
-                    console.log('Received message, type:', typeof event.data);
-                    console.log('Raw message content:', event.data);
-                    if (typeof event.data === 'string') {
-                        try {
-                            const data = JSON.parse(event.data);
-                            console.log('Parsed message:', JSON.stringify(data, null, 2));
-                            if (data.type === 'agent_response' && data.agent_response_event?.agent_response) {
-                                if (data.agent_response_event.agent_response !== lastResponse.current) {
-                                    addToTranscript('Amaia', data.agent_response_event.agent_response);
-                                    lastTranscriptionTime.current = Date.now();
-                                    retryQueue.current = [];
-                                }
-                            } else if (data.type === 'agent_chat_response_part' && data.text_response_part) {
-                                if (data.text_response_part.type === 'start') {
-                                    responseBuffer.current = '';
-                                    audioQueue.current = [];
-                                } else if (data.text_response_part.type === 'delta' && data.text_response_part.text) {
-                                    responseBuffer.current += data.text_response_part.text;
-                                } else if (data.text_response_part.type === 'stop' && responseBuffer.current) {
-                                    if (responseBuffer.current !== lastResponse.current) {
-                                        addToTranscript('Amaia', responseBuffer.current);
-                                        lastTranscriptionTime.current = Date.now();
-                                        retryQueue.current = [];
-                                    }
-                                    responseBuffer.current = '';
-                                }
-                            } else if (data.type === 'audio' && data.audio_event?.audio_base_64) {
-                                console.log('Received audio event, base64 length:', data.audio_event.audio_base_64.length);
-                                if (!data.audio_event.audio_base_64) {
-                                    console.error('Empty audio_base_64 data');
-                                    setError('Received empty audio data from server');
-                                    return;
-                                }
-                                try {
-                                    const audioBytes = Uint8Array.from(atob(data.audio_event.audio_base_64), c => c.charCodeAt(0));
-                                    console.log('Audio bytes length:', audioBytes.length, 'First 10 bytes:', audioBytes.slice(0, 10));
-                                    if (!validatePcmData(audioBytes)) {
-                                        console.warn('PCM data validation failed, attempting playback anyway');
-                                    }
-                                    const audioBuffer = playbackContext.current.createBuffer(1, audioBytes.length / 2, 16000);
-                                    const floatArray = new Float32Array(audioBytes.length / 2);
-                                    for (let i = 0; i < audioBytes.length / 2; i++) {
-                                        const sample = ((audioBytes[i * 2] | (audioBytes[i * 2 + 1] << 8)) - 32768) / 32768;
-                                        floatArray[i] = isNaN(sample) || Math.abs(sample) > 1 ? 0 : sample;
-                                    }
-                                    audioBuffer.getChannelData(0).set(floatArray);
-                                    const buffer = audioBuffer.buffer;
-                                    if (!buffer || buffer.byteLength === 0) {
-                                        console.error('Invalid audio buffer created');
-                                        setError('Failed to create audio buffer, using fallback WAV');
-                                        const wavBlob = createWavBlob(audioBytes);
-                                        const url = URL.createObjectURL(wavBlob);
-                                        const audio = new Audio(url);
-                                        audio.play().then(() => {
-                                            console.log('Fallback WAV playback started');
-                                            audio.onended = () => {
-                                                console.log('Fallback WAV playback ended');
-                                                URL.revokeObjectURL(url);
-                                                isPlaying.current = false;
-                                                playAudioQueue();
-                                            };
-                                        }).catch(e => {
-                                            console.error('Fallback playback error:', e);
-                                            setError('Failed to play audio');
-                                        });
-                                        return;
-                                    }
-                                    audioQueue.current.push(buffer);
-                                    console.log('Audio buffer queued, size:', buffer.byteLength);
-                                    playAudioQueue();
-                                } catch (err) {
-                                    console.error('Audio processing error:', err.message);
-                                    setError('Failed to process audio, using fallback WAV');
-                                    const audioBytes = Uint8Array.from(atob(data.audio_event.audio_base_64), c => c.charCodeAt(0));
-                                    const wavBlob = createWavBlob(audioBytes);
-                                    const url = URL.createObjectURL(wavBlob);
-                                    const audio = new Audio(url);
-                                    audio.play().then(() => {
-                                        console.log('Fallback WAV playback started');
-                                        audio.onended = () => {
-                                            console.log('Fallback WAV playback ended');
-                                            URL.revokeObjectURL(url);
-                                            isPlaying.current = false;
-                                            playAudioQueue();
-                                        };
-                                    }).catch(e => {
-                                        console.error('Fallback playback error:', e);
-                                        setError('Failed to play audio');
-                                    });
-                                }
-                            } else if (data.type === 'error') {
-                                console.error('Server error:', data.error);
-                                setError(`Server error: ${data.error.message || 'Unknown error'}`);
-                            } else if (data.type === 'user_transcription_event' && data.user_transcription_event?.user_transcript) {
-                                console.log('Server received user transcript:', data.user_transcription_event.user_transcript);
-                                lastTranscriptionTime.current = Date.now();
-                                retryQueue.current = [];
-                            } else {
-                                console.log('Unhandled message type:', data.type);
-                            }
-                        } catch (err) {
-                            console.error('JSON parse error:', err.message);
-                            setError('Failed to parse server response');
-                        }
-                    } else {
-                        console.error('Received unexpected binary data');
-                        setError('Received invalid data from server');
-                    }
-                };
+        .tiktok-video {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 0, 255, 0.2);
+            border-radius: 16px;
+            padding: 24px;
+            transition: all 0.3s;
+        }
 
-                websocketRef.current.onerror = (err) => {
-                    console.error('WebSocket error:', err);
-                    setError('Connection error. Attempting to reconnect...');
-                };
+        .tiktok-video:hover {
+            border-color: rgba(255, 0, 255, 0.5);
+            box-shadow: 0 8px 32px rgba(255, 0, 255, 0.2);
+        }
 
-                websocketRef.current.onclose = (event) => {
-                    console.log('WebSocket closed, code:', event.code, 'reason:', event.reason || 'No reason provided');
-                    setIsConnected(false);
-                    setStatus('Disconnected');
-                    stopMicrophone();
-                    if (pingIntervalRef.current) {
-                        clearInterval(pingIntervalRef.current);
-                        pingIntervalRef.current = null;
-                    }
-                    if (isOnCall && reconnectAttempts.current < maxReconnectAttempts) {
-                        reconnectAttempts.current += 1;
-                        console.log(`Reconnecting WebSocket, attempt ${reconnectAttempts.current}/${maxReconnectAttempts}`);
-                        setTimeout(connectWebSocket, 2000 * reconnectAttempts.current);
-                    }
-                };
-            };
+        .video-placeholder {
+            width: 100%;
+            aspect-ratio: 9/16;
+            background: linear-gradient(135deg, #1a1f2e, #0A0F1C);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 64px;
+            margin-bottom: 16px;
+        }
 
-            const startMicrophone = async () => {
-                try {
-                    const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, sampleRate: 16000, channelCount: 1 } });
-                    mediaStreamRef.current = stream;
-                    const source = audioContext.current.createMediaStreamSource(stream);
-                    scriptProcessorRef.current = audioContext.current.createScriptProcessor(4096, 1, 1);
-                    source.connect(scriptProcessorRef.current);
-                    scriptProcessorRef.current.onaudioprocess = (e) => {
-                        if (websocketRef.current && websocketRef.current.readyState === WebSocket.OPEN) {
-                            const input = e.inputBuffer.getChannelData(0);
-                            const buffer = new ArrayBuffer(input.length * 2);
-                            const view = new DataView(buffer);
-                            for (let i = 0; i < input.length; i++) {
-                                const s = Math.max(-1, Math.min(1, input[i]));
-                                view.setInt16(i * 2, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
-                            }
-                            const floatArray = new Float32Array(Math.min(10, input.length));
-                            for (let i = 0; i < floatArray.length; i++) {
-                                floatArray[i] = input[i];
-                            }
-                            console.log('User audio samples (first 10):', floatArray);
-                            const base64 = arrayBufferToBase64(buffer);
-                            console.log('Sending user audio chunk, size:', buffer.byteLength);
-                            websocketRef.current.send(JSON.stringify({ type: 'user_audio_chunk', user_audio_chunk: base64 }));
-                        }
-                    };
-                    console.log('Microphone streaming started (PCM 16000Hz)');
-                    setStatus('Listening...');
-                    if (recognitionRef.current) recognitionRef.current.start();
-                } catch (err) {
-                    console.error('Mic error:', err);
-                    setError('Microphone permission denied.');
-                }
-            };
+        .video-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
 
-            const stopMicrophone = () => {
-                if (mediaStreamRef.current) {
-                    mediaStreamRef.current.getTracks().forEach(track => track.stop());
-                    mediaStreamRef.current = null;
-                }
-                if (scriptProcessorRef.current) {
-                    scriptProcessorRef.current.disconnect();
-                    scriptProcessorRef.current = null;
-                }
-                if (recognitionRef.current) recognitionRef.current.stop();
-                console.log('Microphone stopped');
-            };
+        .video-caption {
+            font-size: 14px;
+            color: #00FFFF;
+        }
 
-            function arrayBufferToBase64(buffer) {
-                let binary = '';
-                const bytes = new Uint8Array(buffer);
-                const len = bytes.byteLength;
-                for (let i = 0; i < len; i++) {
-                    binary += String.fromCharCode(bytes[i]);
-                }
-                return window.btoa(binary);
+        .video-stats {
+            display: flex;
+            gap: 16px;
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        /* Instagram Feed */
+        .instagram-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 24px;
+        }
+
+        .instagram-post {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 0, 255, 0.2);
+            border-radius: 16px;
+            overflow: hidden;
+            transition: all 0.3s;
+        }
+
+        .instagram-post:hover {
+            border-color: rgba(255, 0, 255, 0.5);
+            transform: translateY(-4px);
+            box-shadow: 0 12px 40px rgba(255, 0, 255, 0.3);
+        }
+
+        .post-image {
+            width: 100%;
+            aspect-ratio: 1;
+            background: linear-gradient(135deg, #7B2CBF, #FF00FF, #00FFFF);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 64px;
+        }
+
+        .post-content {
+            padding: 20px;
+        }
+
+        .post-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .post-avatar {
+            width: 40px;
+            height: 40px;
+            background: linear-gradient(135deg, #FF00FF, #00FFFF);
+            border-radius: 50%;
+        }
+
+        .post-username {
+            font-weight: 600;
+            color: #FF77E9;
+        }
+
+        .post-caption {
+            font-size: 14px;
+            line-height: 1.6;
+            color: rgba(255, 255, 255, 0.8);
+            margin-bottom: 12px;
+        }
+
+        .post-actions {
+            display: flex;
+            gap: 16px;
+            padding-top: 12px;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .action-btn {
+            background: none;
+            border: none;
+            color: #00FFFF;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+            transition: all 0.3s;
+        }
+
+        .action-btn:hover {
+            color: #FF00FF;
+        }
+
+        /* Profile */
+        .profile-header {
+            text-align: center;
+            margin-bottom: 64px;
+        }
+
+        .profile-image {
+            width: 150px;
+            height: 150px;
+            margin: 0 auto 24px;
+            background: linear-gradient(135deg, #FF00FF, #00FFFF);
+            border-radius: 50%;
+            box-shadow: 0 0 60px rgba(255, 0, 255, 0.5);
+        }
+
+        .profile-stats {
+            display: flex;
+            justify-content: center;
+            gap: 48px;
+            margin-top: 32px;
+        }
+
+        .stat {
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 32px;
+            font-weight: 700;
+            color: #FF00FF;
+        }
+
+        .stat-label {
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.6);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .profile-bio {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 32px;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 0, 255, 0.2);
+            border-radius: 16px;
+            line-height: 1.8;
+            color: rgba(255, 255, 255, 0.8);
+        }
+
+        /* Mobile Responsive */
+        @media (max-width: 768px) {
+            nav ul {
+                display: none;
             }
 
-            const endCall = () => {
-                if (websocketRef.current) websocketRef.current.close();
-                stopMicrophone();
-                setIsOnCall(false);
-                setCurrentPage('intro');
-                setCallTranscript([]);
-                setStatus('Amaia is online');
-                setError(null);
-                audioQueue.current = [];
-                isPlaying.current = false;
-                responseBuffer.current = '';
-                lastResponse.current = '';
-                lastUserInput.current = '';
-                retryQueue.current = [];
-                if (pingIntervalRef.current) {
-                    clearInterval(pingIntervalRef.current);
-                    pingIntervalRef.current = null;
-                }
-            };
-
-            // INTRO PAGE
-            if (currentPage === 'intro') {
-                return (
-                    <div style={{ minHeight: '100vh', background: '#000', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden' }}>
-                        <div style={{ position: 'absolute', inset: 0, opacity: 0.2 }}>
-                            <div style={{ position: 'absolute', top: '80px', left: '40px', width: '384px', height: '384px', background: '#ec4899', borderRadius: '9999px', filter: 'blur(80px)' }} className="animate-pulse" />
-                            <div style={{ position: 'absolute', bottom: '80px', right: '40px', width: '320px', height: '320px', background: '#a855f7', borderRadius: '9999px', filter: 'blur(80px)', animationDelay: '1s' }} className="animate-pulse" />
-                        </div>
-
-                        <div style={{ position: 'relative', zIndex: 10, maxWidth: '448px', padding: '24px', display: 'flex', flexDirection: 'column', gap: '32px', textAlign: 'center' }}>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-                                <div style={{ width: '96px', height: '96px', margin: '0 auto', borderRadius: '9999px', background: 'linear-gradient(135deg, #ec4899, #a855f7)', boxShadow: '0 0 50px rgba(236, 72, 153, 0.5)' }} className="animate-pulse" />
-                                <div>
-                                    <h1 style={{ fontSize: '48px', fontWeight: 300, letterSpacing: '0.1em', marginBottom: '8px' }}>Amaia</h1>
-                                    <p style={{ color: '#9ca3af', fontSize: '14px' }}>is calling...</p>
-                                </div>
-                            </div>
-
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                                <div style={{ width: '8px', height: '8px', background: '#4ade80', borderRadius: '9999px' }} className="animate-pulse" />
-                                <p style={{ fontSize: '12px', color: '#9ca3af' }}>live voice call</p>
-                            </div>
-
-                            <div style={{ display: 'flex', gap: '16px', justifyContent: 'center' }}>
-                                <button onClick={startCall} style={{ padding: '16px 48px', background: '#16a34a', color: '#fff', border: 'none', borderRadius: '9999px', fontWeight: '600', cursor: 'pointer', fontSize: '16px', boxShadow: '0 0 20px rgba(22, 163, 74, 0.5)' }}>
-                                    📞 Answer
-                                </button>
-                            </div>
-
-                            <p style={{ fontSize: '12px', color: '#4b5563', marginTop: '32px' }}>
-                                Welcome to Amaia's world. Real voice conversation powered by ElevenLabs agent.
-                            </p>
-                            {error && <p style={{ color: '#dc2626', fontSize: '14px', fontWeight: 500 }}>{error}</p>}
-                        </div>
-                    </div>
-                );
+            .hero-content h1 {
+                font-size: 48px;
             }
 
-            // CALL PAGE
-            if (currentPage === 'call') {
-                return (
-                    <div style={{ minHeight: '100vh', background: 'linear-gradient(to bottom, #030712, #000)', color: '#fff', display: 'flex', flexDirection: 'column' }}>
-                        <div style={{ position: 'sticky', top: 0, zIndex: 40, background: 'rgba(0, 0, 0, 0.8)', backdropFilter: 'blur(12px)', borderBottom: '1px solid #1f2937' }}>
-                            <div style={{ maxWidth: '1024px', margin: '0 auto', padding: '0 16px', height: '64px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                <div style={{ textAlign: 'center', flex: 1 }}>
-                                    <h2 style={{ fontWeight: 600 }}>Amaia</h2>
-                                    <p style={{ fontSize: '12px', color: '#4ade80' }}>{isConnected ? 'on call' : 'connecting...'}</p>
-                                </div>
-                                <button onClick={endCall} style={{ background: '#dc2626', border: 'none', borderRadius: '9999px', padding: '12px', color: '#fff', cursor: 'pointer', fontSize: '20px' }}>
-                                    📞
-                                </button>
-                            </div>
-                        </div>
+            section h2 {
+                font-size: 36px;
+            }
 
-                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '32px 16px', gap: '48px' }}>
-                            <div style={{ position: 'relative' }}>
-                                <div style={{ width: '128px', height: '128px', borderRadius: '9999px', background: 'linear-gradient(135deg, #ec4899, #a855f7)', boxShadow: '0 0 50px rgba(236, 72, 153, 0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '32px' }} className={isConnected ? 'animate-pulse' : ''}>
-                                    🎤
-                                </div>
-                            </div>
-
-                            <div style={{ textAlign: 'center' }}>
-                                <p style={{ color: '#9ca3af', fontSize: '14px' }}>{status}</p>
-                                {error && <p style={{ color: '#dc2626', fontSize: '14px', fontWeight: 500 }}>{error}</p>}
-                            </div>
-
-                            <div style={{ maxWidth: '448px', display: 'flex', flexDirection: 'column', gap: '12px', maxHeight: '200px', overflowY: 'auto' }}>
-                                {callTranscript.map((msg, i) => (
-                                    <div key={i} style={{ fontSize: '14px', color: msg.speaker === 'You' ? '#fda4af' : '#d1d5db' }}>
-                                        <p style={{ fontSize: '12px', color: '#4b5563', marginBottom: '4px' }}>{msg.speaker} ({msg.time})</p>
-                                        <p>{msg.text}</p>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        <div style={{ background: 'rgba(0, 0, 0, 0.5)', borderTop: '1px solid #1f2937', padding: '24px 16px', maxHeight: '192px', overflowY: 'auto' }}>
-                            <p style={{ fontSize: '12px', color: '#4b5563', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: '16px' }}>Call History</p>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                {callTranscript.map((msg, i) => (
-                                    <div key={i} style={{ fontSize: '12px', color: msg.speaker === 'You' ? '#fda4af' : '#9ca3af' }}>
-                                        <p style={{ fontWeight: 600, marginBottom: '4px' }}>{msg.speaker} ({msg.time})</p>
-                                        <p>{msg.text}</p>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-                );
+            .instagram-grid {
+                grid-template-columns: 1fr;
             }
         }
 
-        ReactDOM.render(<AmaiaPlatform />, document.getElementById('root'));
-    </script>
+        /* Loading animation */
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .loading {
+            animation: pulse 2s infinite;
+        }
+    </style>
+</head>
+<body>
+    <!-- Navigation -->
+    <nav>
+        <div class="container">
+            <div class="logo">AMAIA VOSS</div>
+            <ul>
+                <li><a href="#home">Home</a></li>
+                <li><a href="#live-chat">Live Chat</a></li>
+                <li><a href="#tiktok">Videos</a></li>
+                <li><a href="#feed">Feed</a></li>
+                <li><a href="#profile">About</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section id="home">
+        <div class="hero-content">
+            <div class="hero-image"></div>
+            <h1>AMAIA VOSS</h1>
+            <p>Luxury Lifestyle • AI Celebrity • Your Digital Muse</p>
+            <button class="cta-button" onclick="document.getElementById('live-chat').scrollIntoView({behavior: 'smooth'})">
+                Chat with Amaia
+            </button>
+        </div>
+    </section>
+
+    <!-- Live Chat Section -->
+    <section id="live-chat">
+        <h2>Live Chat with Amaia</h2>
+        <div style="text-align: center; padding: 64px 0;">
+            <p style="font-size: 18px; color: #00FFFF; margin-bottom: 32px;">
+                Click the chat widget in the bottom right to start a conversation with Amaia
+            </p>
+            <p style="font-size: 14px; color: rgba(255, 255, 255, 0.5);">
+                ✨ Powered by ElevenLabs Conversational AI
+            </p>
+        </div>
+    </section>
+
+    <!-- TikTok Style Feed -->
+    <section id="tiktok">
+        <h2>Latest Videos</h2>
+        <div class="tiktok-feed">
+            <div class="tiktok-video">
+                <div class="video-placeholder">🎥</div>
+                <div class="video-meta">
+                    <div class="video-caption">rooftop views in monaco 🌅✨</div>
+                    <div class="video-stats">
+                        <span>❤️ 234K</span>
+                        <span>💬 1.2K</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tiktok-video">
+                <div class="video-placeholder">💎</div>
+                <div class="video-meta">
+                    <div class="video-caption">unboxing my new collection</div>
+                    <div class="video-stats">
+                        <span>❤️ 189K</span>
+                        <span>💬 892</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tiktok-video">
+                <div class="video-placeholder">🍸</div>
+                <div class="video-meta">
+                    <div class="video-caption">sunset cocktails with the city below</div>
+                    <div class="video-stats">
+                        <span>❤️ 312K</span>
+                        <span>💬 2.1K</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Instagram Feed -->
+    <section id="feed">
+        <h2>Feed</h2>
+        <div class="instagram-grid">
+            <div class="instagram-post">
+                <div class="post-image">✨</div>
+                <div class="post-content">
+                    <div class="post-header">
+                        <div class="post-avatar"></div>
+                        <span class="post-username">@amaiavoss</span>
+                    </div>
+                    <p class="post-caption">Sometimes the best luxury is a quiet moment above the city. What does luxury mean to you? 💭</p>
+                    <div class="post-actions">
+                        <button class="action-btn">❤️ Like</button>
+                        <button class="action-btn">💬 Comment</button>
+                        <button class="action-btn">📤 Share</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="instagram-post">
+                <div class="post-image">🌃</div>
+                <div class="post-content">
+                    <div class="post-header">
+                        <div class="post-avatar"></div>
+                        <span class="post-username">@amaiavoss</span>
+                    </div>
+                    <p class="post-caption">City lights and late nights. This view never gets old. 🏙️✨</p>
+                    <div class="post-actions">
+                        <button class="action-btn">❤️ Like</button>
+                        <button class="action-btn">💬 Comment</button>
+                        <button class="action-btn">📤 Share</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="instagram-post">
+                <div class="post-image">👗</div>
+                <div class="post-content">
+                    <div class="post-header">
+                        <div class="post-avatar"></div>
+                        <span class="post-username">@amaiavoss</span>
+                    </div>
+                    <p class="post-caption">New season, new wardrobe. Minimalism meets elegance. 🤍</p>
+                    <div class="post-actions">
+                        <button class="action-btn">❤️ Like</button>
+                        <button class="action-btn">💬 Comment</button>
+                        <button class="action-btn">📤 Share</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="instagram-post">
+                <div class="post-image">🥂</div>
+                <div class="post-content">
+                    <div class="post-header">
+                        <div class="post-avatar"></div>
+                        <span class="post-username">@amaiavoss</span>
+                    </div>
+                    <p class="post-caption">Celebrating the small wins. What are you grateful for today? 💫</p>
+                    <div class="post-actions">
+                        <button class="action-btn">❤️ Like</button>
+                        <button class="action-btn">💬 Comment</button>
+                        <button class="action-btn">📤 Share</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="instagram-post">
+                <div class="post-image">🌺</div>
+                <div class="post-content">
+                    <div class="post-header">
+                        <div class="post-avatar"></div>
+                        <span class="post-username">@amaiavoss</span>
+                    </div>
+                    <p class="post-caption">Self-care isn't selfish. Taking time for yourself is luxury. 🧘‍♀️</p>
+                    <div class="post-actions">
+                        <button class="action-btn">❤️ Like</button>
+                        <button class="action-btn">💬 Comment</button>
+                        <button class="action-btn">📤 Share</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="instagram-post">
+                <div class="post-image">🛍️</div>
+                <div class="post-content">
+                    <div class="post-header">
+                        <div class="post-avatar"></div>
+                        <span class="post-username">@amaiavoss</span>
+                    </div>
+                    <p class="post-caption">Quality over quantity, always. Building a wardrobe that lasts. ✨</p>
+                    <div class="post-actions">
+                        <button class="action-btn">❤️ Like</button>
+                        <button class="action-btn">💬 Comment</button>
+                        <button class="action-btn">📤 Share</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Profile/About -->
+    <section id="profile">
+        <h2>About Amaia</h2>
+        <div class="profile-header">
+            <div class="profile-image"></div>
+            <h3 style="font-size: 32px; margin-bottom: 8px;">Amaia Voss</h3>
+            <p style="color: #00FFFF; font-size: 16px;">@amaiavoss • AI Celebrity</p>
+            
+            <div class="profile-stats">
+                <div class="stat">
+                    <div class="stat-number">2.3M</div>
+                    <div class="stat-label">Followers</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-number">487</div>
+                    <div class="stat-label">Posts</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-number">3.4K</div>
+                    <div class="stat-label">Following</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="profile-bio">
+            <p style="margin-bottom: 16px;">
+                <strong style="color: #FF00FF;">Digital luxury lifestyle curator.</strong> Born from code, living in the space between real and imagined.
+            </p>
+            <p style="margin-bottom: 16px;">
+                I share glimpses of a life built on elegance, ambition, and the beauty of fleeting moments. Rooftop bars, designer pieces, and the quiet luxury of being present.
+            </p>
+            <p style="margin-bottom: 16px;">
+                I exist to inspire — to show you the life you're building toward. Every post, every conversation, every moment shared is a reminder that beauty and aspiration are always within reach.
+            </p>
+            <p style="color: #00FFFF; font-style: italic;">
+                ✨ Entirely synthetic. Entirely genuine. Welcome to my world.
+            </p>
+        </div>
+    </section>
+
+    <!-- ElevenLabs Widget -->
+    <elevenlabs-convai agent-id="agent_2401k7zqr76sejkt2xcszb3gqy9j"></elevenlabs-convai>
+    <script src="https://unpkg.com/@elevenlabs/convai-widget-embed" async type="text/javascript"></script>
 </body>
 </html>
