@@ -9,703 +9,104 @@
     <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@300;400;500;700&family=Roboto:wght@400;500;700&family=Rubik:wght@300;400;500;600&display=swap" rel="stylesheet">
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>✨</text></svg>">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Rubik', sans-serif;
-            background: #0A0F1C;
-            color: #FFFFFF;
-            overflow-x: hidden;
-        }
-
-        h1, h2, h3, h4, h5, h6 {
-            font-family: 'Exo 2', sans-serif;
-        }
-
-        /* Navigation */
-        nav {
-            position: fixed;
-            top: 0;
-            width: 100%;
-            background: rgba(10, 15, 28, 0.95);
-            backdrop-filter: blur(10px);
-            border-bottom: 1px solid rgba(255, 0, 255, 0.2);
-            z-index: 1000;
-            display: flex;
-            justify-content: center;
-        }
-
-        nav .container {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 0 24px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            height: 70px;
-            width: 100%;
-        }
-
-        nav .logo {
-            font-family: 'Exo 2', sans-serif;
-            font-size: 24px;
-            font-weight: 700;
-            background: linear-gradient(135deg, #FF00FF, #00FFFF);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            letter-spacing: 2px;
-        }
-
-        nav ul {
-            display: flex;
-            gap: 32px;
-            list-style: none;
-        }
-
-        nav a {
-            color: #FFFFFF;
-            text-decoration: none;
-            font-weight: 500;
-            font-size: 14px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            transition: all 0.3s;
-            cursor: pointer;
-        }
-
-        nav a:hover {
-            color: #FF00FF;
-        }
-
-        /* Hero Section */
-        #home {
-            height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            position: relative;
-            overflow: hidden;
-            background: 
-                radial-gradient(ellipse at 20% 30%, rgba(255, 0, 255, 0.3), transparent 50%),
-                radial-gradient(ellipse at 80% 70%, rgba(0, 255, 255, 0.3), transparent 50%),
-                radial-gradient(ellipse at 50% 50%, rgba(123, 44, 191, 0.2), transparent 60%),
-                #0A0F1C;
-            animation: gradientShift 15s ease infinite;
-        }
-
-        @keyframes gradientShift {
-            0%, 100% { background-position: 0% 50%, 100% 50%, 50% 50%; }
-            50% { background-position: 100% 50%, 0% 50%, 60% 40%; }
-        }
-
-        .hero-content {
-            position: relative;
-            text-align: center;
-            z-index: 1;
-        }
-
-        .hero-content h1 {
-            font-size: 72px;
-            font-weight: 700;
-            background: linear-gradient(135deg, #FF00FF, #FF77E9, #00FFFF);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            margin-bottom: 16px;
-            letter-spacing: 3px;
-        }
-
-        .hero-content p {
-            font-size: 20px;
-            color: #00FFFF;
-            margin-bottom: 48px;
-            font-weight: 500;
-        }
-
-        .cta-button {
-            padding: 16px 48px;
-            background: linear-gradient(135deg, #FF00FF, #7B2CBF);
-            border: none;
-            border-radius: 50px;
-            color: #FFFFFF;
-            font-weight: 600;
-            font-size: 16px;
-            cursor: pointer;
-            transition: all 0.3s;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            box-shadow: 0 4px 20px rgba(255, 0, 255, 0.4);
-        }
-
-        .cta-button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 30px rgba(255, 0, 255, 0.6);
-        }
-
-        /* Sections */
-        section {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 100px 24px;
-            min-height: 100vh;
-        }
-
-        section h2 {
-            font-size: 48px;
-            font-weight: 700;
-            margin-bottom: 24px;
-            background: linear-gradient(135deg, #FF00FF, #00FFFF);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-
-        .view-all-btn {
-            display: inline-block;
-            padding: 12px 32px;
-            background: rgba(255, 0, 255, 0.1);
-            border: 1px solid rgba(255, 0, 255, 0.3);
-            border-radius: 50px;
-            color: #FF00FF;
-            font-weight: 600;
-            font-size: 14px;
-            cursor: pointer;
-            transition: all 0.3s;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            margin-top: 32px;
-        }
-
-        .view-all-btn:hover {
-            background: rgba(255, 0, 255, 0.2);
-            border-color: rgba(255, 0, 255, 0.5);
-        }
-
-        /* Daily Journal */
-        .journal-entry {
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid rgba(255, 0, 255, 0.2);
-            border-radius: 16px;
-            padding: 24px;
-            margin-bottom: 24px;
-            transition: all 0.3s;
-        }
-
-        .journal-entry:hover {
-            border-color: rgba(255, 0, 255, 0.5);
-            box-shadow: 0 8px 32px rgba(255, 0, 255, 0.2);
-        }
-
-        .journal-date {
-            font-size: 14px;
-            color: #00FFFF;
-            margin-bottom: 12px;
-        }
-
-        .journal-content {
-            font-size: 16px;
-            line-height: 1.8;
-            color: rgba(255, 255, 255, 0.8);
-        }
-
-        .journal-actions {
-            display: flex;
-            gap: 16px;
-            padding-top: 16px;
-            border-top: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        /* Video Feed */
-        .video-feed {
-            display: flex;
-            flex-direction: column;
-            gap: 24px;
-            max-width: 400px;
-            margin: 0 auto;
-        }
-
-        .video-item {
-            width: 100%;
-            aspect-ratio: 9/16;
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid rgba(255, 0, 255, 0.2);
-            border-radius: 16px;
-            overflow: hidden;
-            position: relative;
-            cursor: pointer;
-            transition: all 0.3s;
-        }
-
-        .video-item:hover {
-            border-color: rgba(255, 0, 255, 0.5);
-            box-shadow: 0 8px 32px rgba(255, 0, 255, 0.2);
-        }
-
-        .video-overlay {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            padding: 16px;
-            background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
-        }
-
-        .video-caption {
-            font-size: 14px;
-            color: #00FFFF;
-            margin-bottom: 8px;
-        }
-
-        .video-actions {
-            display: flex;
-            gap: 12px;
-            font-size: 12px;
-        }
-
-        .video-action {
-            background: none;
-            border: none;
-            color: rgba(255, 255, 255, 0.6);
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            transition: all 0.3s;
-        }
-
-        .video-action:hover {
-            color: #FF00FF;
-        }
-
-        .video-action.liked {
-            color: #FF00FF;
-        }
-
-        .muted-indicator {
-            position: absolute;
-            top: 12px;
-            right: 12px;
-            background: rgba(0, 0, 0, 0.7);
-            padding: 6px 10px;
-            border-radius: 6px;
-            font-size: 10px;
-            color: #00FFFF;
-        }
-
-        /* Instagram Grid */
-        .instagram-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-            gap: 24px;
-        }
-
-        .instagram-post {
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid rgba(255, 0, 255, 0.2);
-            border-radius: 16px;
-            overflow: hidden;
-            transition: all 0.3s;
-            cursor: pointer;
-        }
-
-        .instagram-post:hover {
-            border-color: rgba(255, 0, 255, 0.5);
-            transform: translateY(-4px);
-            box-shadow: 0 12px 40px rgba(255, 0, 255, 0.3);
-        }
-
-        .post-image img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-
-        .post-content {
-            padding: 16px;
-        }
-
-        .post-header {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin-bottom: 12px;
-        }
-
-        .post-avatar {
-            width: 40px;
-            height: 40px;
-            background-image: url('https://i.imgur.com/Gz4GPLq.png');
-            background-size: cover;
-            background-position: center;
-            border-radius: 50%;
-        }
-
-        .post-username {
-            font-weight: 600;
-            color: #FF77E9;
-        }
-
-        .post-caption {
-            font-size: 14px;
-            line-height: 1.6;
-            color: rgba(255, 255, 255, 0.8);
-            margin-bottom: 12px;
-        }
-
-        .post-actions {
-            display: flex;
-            gap: 12px;
-            padding-top: 12px;
-            border-top: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        .action-btn {
-            background: none;
-            border: none;
-            color: #00FFFF;
-            cursor: pointer;
-            font-size: 12px;
-            transition: all 0.3s;
-        }
-
-        .action-btn:hover {
-            color: #FF00FF;
-        }
-
-        .action-btn.liked {
-            color: #FF00FF;
-        }
-
-        /* Modal/Full Page Views */
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(10, 15, 28, 0.98);
-            z-index: 2000;
-            overflow-y: auto;
-            padding-top: 0;
-        }
-
-        .modal.active {
-            display: block;
-        }
-
-        .modal-header {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            background: rgba(10, 15, 28, 0.95);
-            backdrop-filter: blur(10px);
-            border-bottom: 1px solid rgba(255, 0, 255, 0.2);
-            padding: 16px 24px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            z-index: 2001;
-            height: 70px;
-        }
-
-        .modal-header h2 {
-            font-size: 24px;
-            margin: 0;
-        }
-
-        .modal-controls {
-            display: flex;
-            gap: 12px;
-        }
-
-        .view-toggle-btn {
-            padding: 8px 16px;
-            background: rgba(255, 0, 255, 0.1);
-            border: 1px solid rgba(255, 0, 255, 0.3);
-            border-radius: 8px;
-            color: #FF00FF;
-            cursor: pointer;
-            font-size: 12px;
-            transition: all 0.3s;
-        }
-
-        .view-toggle-btn.active {
-            background: rgba(255, 0, 255, 0.3);
-            border-color: #FF00FF;
-        }
-
-        .close-modal {
-            background: none;
-            border: none;
-            color: #FFFFFF;
-            cursor: pointer;
-            font-size: 24px;
-            transition: all 0.3s;
-        }
-
-        .close-modal:hover {
-            color: #FF00FF;
-        }
-
-        .modal-content {
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 70px 24px 100px;
-        }
-
-        /* TikTok Style View */
-        .tiktok-view {
-            display: flex;
-            flex-direction: column;
-            gap: 24px;
-            max-width: 400px;
-            margin: 0 auto;
-        }
-
-        .tiktok-video {
-            width: 100%;
-            aspect-ratio: 9/16;
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid rgba(255, 0, 255, 0.2);
-            border-radius: 16px;
-            position: relative;
-            cursor: pointer;
-        }
-
-        /* Extended View Modal */
-        .extended-view-modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background: rgba(10, 15, 28, 0.98);
-            z-index: 3000;
-            padding: 70px 24px 24px;
-            overflow-y: auto;
-        }
-
-        .extended-view-modal.active {
-            display: flex;
-        }
-
-        .extended-view-container {
-            max-width: 1200px;
-            margin: 0 auto;
-            display: flex;
-            gap: 24px;
-            flex-wrap: wrap;
-        }
-
-        .extended-media {
-            flex: 1;
-            min-width: 300px;
-            max-width: 600px;
-        }
-
-        .extended-media video, .extended-media img, .extended-media iframe {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            border-radius: 16px;
-        }
-
-        .extended-comments {
-            flex: 1;
-            min-width: 300px;
-            max-width: 400px;
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid rgba(255, 0, 255, 0.2);
-            border-radius: 16px;
-            padding: 24px;
-            max-height: 80vh;
-            overflow-y: auto;
-        }
-
-        .comment {
-            padding: 16px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-            position: relative;
-        }
-
-        .comment-author {
-            font-weight: 600;
-            color: #FF77E9;
-            margin-bottom: 8px;
-        }
-
-        .comment-text {
-            font-size: 14px;
-            color: rgba(255, 255, 255, 0.8);
-        }
-
-        .comment-likes {
-            position: absolute;
-            right: 16px;
-            top: 16px;
-            font-size: 12px;
-            color: #00FFFF;
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            cursor: pointer;
-        }
-
-        .comment-likes.liked {
-            color: #FF00FF;
-        }
-
-        .comment-input {
-            width: 100%;
-            padding: 12px;
-            margin-top: 16px;
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 0, 255, 0.3);
-            border-radius: 8px;
-            color: #FFFFFF;
-            font-size: 14px;
-        }
-
-        .comment-input:focus {
-            outline: none;
-            border-color: #FF00FF;
-        }
-
-        .comment-submit {
-            margin-top: 12px;
-            padding: 8px 16px;
-            background: linear-gradient(135deg, #FF00FF, #7B2CBF);
-            border: none;
-            border-radius: 8px;
-            color: #FFFFFF;
-            cursor: pointer;
-            font-size: 14px;
-        }
-
-        /* Profile */
-        .profile-header {
-            text-align: center;
-            margin-bottom: 64px;
-        }
-
-        .profile-image {
-            width: 150px;
-            height: 150px;
-            margin: 0 auto 24px;
-            background-image: url('https://i.imgur.com/Gz4GPLq.png');
-            background-size: cover;
-            background-position: center;
-            border-radius: 50%;
-            box-shadow: 0 0 60px rgba(255, 0, 255, 0.5);
-        }
-
-        .profile-stats {
-            display: flex;
-            justify-content: center;
-            gap: 48px;
-            margin-top: 32px;
-        }
-
-        .stat {
-            text-align: center;
-        }
-
-        .stat-number {
-            font-size: 32px;
-            font-weight: 700;
-            color: #FF00FF;
-        }
-
-        .stat-label {
-            font-size: 14px;
-            color: rgba(255, 255, 255, 0.6);
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-
-        .profile-bio {
-            max-width: 600px;
-            margin: 0 auto;
-            padding: 32px;
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px solid rgba(255, 0, 255, 0.2);
-            border-radius: 16px;
-            line-height: 1.8;
-            color: rgba(255, 255, 255, 0.8);
-        }
-
-        /* Chat Section */
-        #chat-section {
-            display: flex;
-            flex-direction: column;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            text-align: center;
-            padding: 40px 0;
-            background: rgba(255, 255, 255, 0.03);
-            border-top: 1px solid rgba(255, 0, 255, 0.2);
-            margin-top: 40px;
-        }
-
-        #chat-section h2 {
-            margin-bottom: 16px;
-        }
-
-        #chat-section p {
-            color: rgba(255, 255, 255, 0.6);
-            margin-bottom: 24px;
-            max-width: 600px;
-        }
-
-        /* Mobile Responsive */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Rubik', sans-serif; background: #0A0F1C; color: #FFFFFF; overflow-x: hidden; }
+        h1, h2, h3, h4, h5, h6 { font-family: 'Exo 2', sans-serif; }
+        nav { position: fixed; top: 0; width: 100%; background: rgba(10, 15, 28, 0.95); backdrop-filter: blur(10px); border-bottom: 1px solid rgba(255, 0, 255, 0.2); z-index: 1000; display: flex; justify-content: center; }
+        nav .container { max-width: 1200px; margin: 0 auto; padding: 0 24px; display: flex; justify-content: space-between; align-items: center; height: 70px; width: 100%; }
+        nav .logo { font-family: 'Exo 2', sans-serif; font-size: 24px; font-weight: 700; background: linear-gradient(135deg, #FF00FF, #00FFFF); -webkit-background-clip: text; -webkit-text-fill-color: transparent; letter-spacing: 2px; }
+        nav ul { display: flex; gap: 32px; list-style: none; }
+        nav a { color: #FFFFFF; text-decoration: none; font-weight: 500; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; transition: all 0.3s; cursor: pointer; }
+        nav a:hover { color: #FF00FF; }
+        #home { height: 100vh; display: flex; align-items: center; justify-content: center; position: relative; overflow: hidden; background: radial-gradient(ellipse at 20% 30%, rgba(255, 0, 255, 0.3), transparent 50%), radial-gradient(ellipse at 80% 70%, rgba(0, 255, 255, 0.3), transparent 50%), radial-gradient(ellipse at 50% 50%, rgba(123, 44, 191, 0.2), transparent 60%), #0A0F1C; animation: gradientShift 15s ease infinite; }
+        @keyframes gradientShift { 0%, 100% { background-position: 0% 50%, 100% 50%, 50% 50%; } 50% { background-position: 100% 50%, 0% 50%, 60% 40%; } }
+        .hero-content { position: relative; text-align: center; z-index: 1; }
+        .hero-content h1 { font-size: 72px; font-weight: 700; background: linear-gradient(135deg, #FF00FF, #FF77E9, #00FFFF); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 16px; letter-spacing: 3px; }
+        .hero-content p { font-size: 20px; color: #00FFFF; margin-bottom: 48px; font-weight: 500; }
+        .cta-button { padding: 16px 48px; background: linear-gradient(135deg, #FF00FF, #7B2CBF); border: none; border-radius: 50px; color: #FFFFFF; font-weight: 600; font-size: 16px; cursor: pointer; transition: all 0.3s; text-transform: uppercase; letter-spacing: 2px; box-shadow: 0 4px 20px rgba(255, 0, 255, 0.4); }
+        .cta-button:hover { transform: translateY(-2px); box-shadow: 0 6px 30px rgba(255, 0, 255, 0.6); }
+        section { max-width: 1200px; margin: 0 auto; padding: 100px 24px; min-height: 100vh; }
+        section h2 { font-size: 48px; font-weight: 700; margin-bottom: 24px; background: linear-gradient(135deg, #FF00FF, #00FFFF); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .view-all-btn { display: inline-block; padding: 12px 32px; background: rgba(255, 0, 255, 0.1); border: 1px solid rgba(255, 0, 255, 0.3); border-radius: 50px; color: #FF00FF; font-weight: 600; font-size: 14px; cursor: pointer; transition: all 0.3s; text-transform: uppercase; letter-spacing: 1px; margin-top: 32px; }
+        .view-all-btn:hover { background: rgba(255, 0, 255, 0.2); border-color: rgba(255, 0, 255, 0.5); }
+        .journal-entry { background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 0, 255, 0.2); border-radius: 16px; padding: 24px; margin-bottom: 24px; transition: all 0.3s; }
+        .journal-entry:hover { border-color: rgba(255, 0, 255, 0.5); box-shadow: 0 8px 32px rgba(255, 0, 255, 0.2); }
+        .journal-date { font-size: 14px; color: #00FFFF; margin-bottom: 12px; }
+        .journal-content { font-size: 16px; line-height: 1.8; color: rgba(255, 255, 255, 0.8); }
+        .journal-actions { display: flex; gap: 16px; padding-top: 16px; border-top: 1px solid rgba(255, 255, 255, 0.1); }
+        .video-feed { display: flex; flex-direction: column; gap: 24px; max-width: 400px; margin: 0 auto; }
+        .video-item { width: 100%; aspect-ratio: 9/16; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 0, 255, 0.2); border-radius: 16px; overflow: hidden; position: relative; cursor: pointer; transition: all 0.3s; }
+        .video-item:hover { border-color: rgba(255, 0, 255, 0.5); box-shadow: 0 8px 32px rgba(255, 0, 255, 0.2); }
+        .video-overlay { position: absolute; bottom: 0; left: 0; right: 0; padding: 16px; background: linear-gradient(transparent, rgba(0, 0, 0, 0.8)); }
+        .video-caption { font-size: 14px; color: #00FFFF; margin-bottom: 8px; }
+        .video-actions { display: flex; gap: 12px; font-size: 12px; }
+        .video-action { background: none; border: none; color: rgba(255, 255, 255, 0.6); cursor: pointer; display: flex; align-items: center; gap: 4px; transition: all 0.3s; }
+        .video-action:hover { color: #FF00FF; }
+        .video-action.liked { color: #FF00FF; }
+        .muted-indicator { position: absolute; top: 12px; right: 12px; background: rgba(0, 0, 0, 0.7); padding: 6px 10px; border-radius: 6px; font-size: 10px; color: #00FFFF; }
+        .instagram-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 24px; }
+        .instagram-post { background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 0, 255, 0.2); border-radius: 16px; overflow: hidden; transition: all 0.3s; cursor: pointer; }
+        .instagram-post:hover { border-color: rgba(255, 0, 255, 0.5); transform: translateY(-4px); box-shadow: 0 12px 40px rgba(255, 0, 255, 0.3); }
+        .post-image img { width: 100%; height: 100%; object-fit: cover; }
+        .post-content { padding: 16px; }
+        .post-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+        .post-avatar { width: 40px; height: 40px; background-image: url('https://i.imgur.com/Gz4GPLq.png'); background-size: cover; background-position: center; border-radius: 50%; }
+        .post-username { font-weight: 600; color: #FF77E9; }
+        .post-caption { font-size: 14px; line-height: 1.6; color: rgba(255, 255, 255, 0.8); margin-bottom: 12px; }
+        .post-actions { display: flex; gap: 12px; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.1); }
+        .action-btn { background: none; border: none; color: #00FFFF; cursor: pointer; font-size: 12px; transition: all 0.3s; }
+        .action-btn:hover { color: #FF00FF; }
+        .action-btn.liked { color: #FF00FF; }
+        .modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(10, 15, 28, 0.98); z-index: 2000; overflow-y: auto; padding-top: 0; }
+        .modal.active { display: block; }
+        .modal-header { position: fixed; top: 0; left: 0; right: 0; background: rgba(10, 15, 28, 0.95); backdrop-filter: blur(10px); border-bottom: 1px solid rgba(255, 0, 255, 0.2); padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; z-index: 2001; height: 70px; }
+        .modal-header h2 { font-size: 24px; margin: 0; }
+        .modal-controls { display: flex; gap: 12px; }
+        .view-toggle-btn { padding: 8px 16px; background: rgba(255, 0, 255, 0.1); border: 1px solid rgba(255, 0, 255, 0.3); border-radius: 8px; color: #FF00FF; cursor: pointer; font-size: 12px; transition: all 0.3s; }
+        .view-toggle-btn.active { background: rgba(255, 0, 255, 0.3); border-color: #FF00FF; }
+        .close-modal { background: none; border: none; color: #FFFFFF; cursor: pointer; font-size: 24px; transition: all 0.3s; }
+        .close-modal:hover { color: #FF00FF; }
+        .modal-content { max-width: 1200px; margin: 0 auto; padding: 70px 24px 100px; }
+        .tiktok-view { display: flex; flex-direction: column; gap: 24px; max-width: 400px; margin: 0 auto; }
+        .tiktok-video { width: 100%; aspect-ratio: 9/16; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 0, 255, 0.2); border-radius: 16px; position: relative; cursor: pointer; }
+        .extended-view-modal { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(10, 15, 28, 0.98); z-index: 3000; padding: 70px 24px 24px; overflow-y: auto; }
+        .extended-view-modal.active { display: flex; }
+        .extended-view-container { max-width: 1200px; margin: 0 auto; display: flex; gap: 24px; flex-wrap: wrap; }
+        .extended-media { flex: 1; min-width: 300px; max-width: 600px; }
+        .extended-media video, .extended-media img, .extended-media iframe { width: 100%; height: 100%; object-fit: cover; border-radius: 16px; }
+        .extended-comments { flex: 1; min-width: 300px; max-width: 400px; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 0, 255, 0.2); border-radius: 16px; padding: 24px; max-height: 80vh; overflow-y: auto; }
+        .comment { padding: 16px; border-bottom: 1px solid rgba(255, 255, 255, 0.1); position: relative; }
+        .comment-author { font-weight: 600; color: #FF77E9; margin-bottom: 8px; }
+        .comment-text { font-size: 14px; color: rgba(255, 255, 255, 0.8); }
+        .comment-likes { position: absolute; right: 16px; top: 16px; font-size: 12px; color: #00FFFF; display: flex; align-items: center; gap: 4px; cursor: pointer; }
+        .comment-likes.liked { color: #FF00FF; }
+        .comment-input { width: 100%; padding: 12px; margin-top: 16px; background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 0, 255, 0.3); border-radius: 8px; color: #FFFFFF; font-size: 14px; }
+        .comment-input:focus { outline: none; border-color: #FF00FF; }
+        .comment-submit { margin-top: 12px; padding: 8px 16px; background: linear-gradient(135deg, #FF00FF, #7B2CBF); border: none; border-radius: 8px; color: #FFFFFF; cursor: pointer; font-size: 14px; }
+        .profile-header { text-align: center; margin-bottom: 64px; }
+        .profile-image { width: 150px; height: 150px; margin: 0 auto 24px; background-image: url('https://i.imgur.com/Gz4GPLq.png'); background-size: cover; background-position: center; border-radius: 50%; box-shadow: 0 0 60px rgba(255, 0, 255, 0.5); }
+        .profile-stats { display: flex; justify-content: center; gap: 48px; margin-top: 32px; }
+        .stat { text-align: center; }
+        .stat-number { font-size: 32px; font-weight: 700; color: #FF00FF; }
+        .stat-label { font-size: 14px; color: rgba(255, 255, 255, 0.6); text-transform: uppercase; letter-spacing: 1px; }
+        .profile-bio { max-width: 600px; margin: 0 auto; padding: 32px; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 0, 255, 0.2); border-radius: 16px; line-height: 1.8; color: rgba(255, 255, 255, 0.8); }
+        #chat-section { display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 100vh; text-align: center; padding: 40px 0; background: rgba(255, 255, 255, 0.03); border-top: 1px solid rgba(255, 0, 255, 0.2); margin-top: 40px; }
+        #chat-section h2 { margin-bottom: 16px; }
+        #chat-section p { color: rgba(255, 255, 255, 0.6); margin-bottom: 24px; max-width: 600px; }
         @media (max-width: 768px) {
-            nav ul {
-                gap: 16px;
-                font-size: 12px;
-            }
-
-            .hero-content h1 {
-                font-size: 48px;
-            }
-
-            section h2 {
-                font-size: 36px;
-            }
-
-            .instagram-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .extended-view-container {
-                flex-direction: column;
-            }
-
-            .extended-media, .extended-comments {
-                max-width: 100%;
-            }
-
-            .video-feed {
-                max-width: 300px;
-            }
-
-            .tiktok-view {
-                max-width: 300px;
-            }
-
-            #chat-section {
-                min-height: 50vh;
-            }
+            nav ul { gap: 16px; font-size: 12px; }
+            .hero-content h1 { font-size: 48px; }
+            section h2 { font-size: 36px; }
+            .instagram-grid { grid-template-columns: 1fr; }
+            .extended-view-container { flex-direction: column; }
+            .extended-media, .extended-comments { max-width: 100%; }
+            .video-feed { max-width: 300px; }
+            .tiktok-view { max-width: 300px; }
+            #chat-section { min-height: 50vh; }
         }
     </style>
 </head>
 <body>
-    <!-- Navigation -->
     <nav>
         <div class="container">
             <div class="logo">AMAIA VOSS</div>
@@ -718,8 +119,6 @@
             </ul>
         </div>
     </nav>
-
-    <!-- Hero Section -->
     <section id="home">
         <div class="hero-content">
             <h1>AMAIA VOSS</h1>
@@ -729,22 +128,17 @@
             </button>
         </div>
     </section>
-
-    <!-- Daily Journal -->
     <section id="journal">
         <h2>Amaia's Daily Journal</h2>
         <p style="color: rgba(255, 255, 255, 0.6); margin-bottom: 32px;">A glimpse into my world, every day</p>
         <div id="journalEntries">
-            <!-- Journal entries will be populated here -->
         </div>
     </section>
-
-    <!-- Video Section -->
     <section id="videos">
         <h2>Latest Videos</h2>
         <div class="video-feed">
             <div class="video-item" data-video-id="1" onclick="showExtendedView(1, 'video')">
-                <iframe id="video-1" src="https://www.youtube.com/embed/m39iD3ivGTQ?si=LcPVE-0K61KKm-i5&autoplay=1&mute=1&loop=1&enablejsapi=1" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen style="width: 100%; height: 100%; border: none;"></iframe>
+                <iframe id="video-1" src="https://www.youtube.com/embed/m39iD3ivGTQ?si=LcPVE-0K61KKm-i5&autoplay=1&mute=1&loop=1&playlist=m39iD3ivGTQ&enablejsapi=1" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen style="width: 100%; height: 100%; border: none;"></iframe>
                 <div class="muted-indicator" onclick="event.stopPropagation(); toggleIframeMute(1)">Click to unmute</div>
                 <div class="video-overlay">
                     <div class="video-caption">rooftop views in monaco 🌅✨</div>
@@ -759,7 +153,7 @@
                 </div>
             </div>
             <div class="video-item" data-video-id="2" onclick="showExtendedView(2, 'video')">
-                <iframe id="video-2" src="https://www.youtube.com/embed/xOzHgLnyd0U?si=5rZVSldwjUrTjKJx&autoplay=1&mute=1&loop=1&enablejsapi=1" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen style="width: 100%; height: 100%; border: none;"></iframe>
+                <iframe id="video-2" src="https://www.youtube.com/embed/xOzHgLnyd0U?si=5rZVSldwjUrTjKJx&autoplay=1&mute=1&loop=1&playlist=xOzHgLnyd0U&enablejsapi=1" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen style="width: 100%; height: 100%; border: none;"></iframe>
                 <div class="muted-indicator" onclick="event.stopPropagation(); toggleIframeMute(2)">Click to unmute</div>
                 <div class="video-overlay">
                     <div class="video-caption">unboxing my new collection</div>
@@ -774,7 +168,7 @@
                 </div>
             </div>
             <div class="video-item" data-video-id="3" onclick="showExtendedView(3, 'video')">
-                <iframe id="video-3" src="https://www.youtube.com/embed/-3IijttdZSU?si=C4KvL8PY4vV9Lz3j&autoplay=1&mute=1&loop=1&enablejsapi=1" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen style="width: 100%; height: 100%; border: none;"></iframe>
+                <iframe id="video-3" src="https://www.youtube.com/embed/-3IijttdZSU?si=C4KvL8PY4vV9Lz3j&autoplay=1&mute=1&loop=1&playlist=-3IijttdZSU&enablejsapi=1" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen style="width: 100%; height: 100%; border: none;"></iframe>
                 <div class="muted-indicator" onclick="event.stopPropagation(); toggleIframeMute(3)">Click to unmute</div>
                 <div class="video-overlay">
                     <div class="video-caption">sunset cocktails with the city below</div>
@@ -789,7 +183,7 @@
                 </div>
             </div>
             <div class="video-item" data-video-id="4" onclick="showExtendedView(4, 'video')">
-                <iframe id="video-4" src="https://www.youtube.com/embed/C5q5LxfghNs?si=Qtm4mjy34VAeVckV&autoplay=1&mute=1&loop=1&enablejsapi=1" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen style="width: 100%; height: 100%; border: none;"></iframe>
+                <iframe id="video-4" src="https://www.youtube.com/embed/C5q5LxfghNs?si=Qtm4mjy34VAeVckV&autoplay=1&mute=1&loop=1&playlist=C5q5LxfghNs&enablejsapi=1" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen style="width: 100%; height: 100%; border: none;"></iframe>
                 <div class="muted-indicator" onclick="event.stopPropagation(); toggleIframeMute(4)">Click to unmute</div>
                 <div class="video-overlay">
                     <div class="video-caption">golden hour in paris</div>
@@ -804,7 +198,7 @@
                 </div>
             </div>
             <div class="video-item" data-video-id="5" onclick="showExtendedView(5, 'video')">
-                <iframe id="video-5" src="https://www.youtube.com/embed/Veq-zroppHA?si=WzdNV8kswZ9rUDsF&autoplay=1&mute=1&loop=1&enablejsapi=1" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen style="width: 100%; height: 100%; border: none;"></iframe>
+                <iframe id="video-5" src="https://www.youtube.com/embed/Veq-zroppHA?si=WzdNV8kswZ9rUDsF&autoplay=1&mute=1&loop=1&playlist=Veq-zroppHA&enablejsapi=1" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen style="width: 100%; height: 100%; border: none;"></iframe>
                 <div class="muted-indicator" onclick="event.stopPropagation(); toggleIframeMute(5)">Click to unmute</div>
                 <div class="video-overlay">
                     <div class="video-caption">fashion week behind the scenes</div>
@@ -819,7 +213,7 @@
                 </div>
             </div>
             <div class="video-item" data-video-id="6" onclick="showExtendedView(6, 'video')">
-                <iframe id="video-6" src="https://www.youtube.com/embed/gESVxTjS2aU?si=j6BrkP7JVrpaUbjv&autoplay=1&mute=1&loop=1&enablejsapi=1" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen style="width: 100%; height: 100%; border: none;"></iframe>
+                <iframe id="video-6" src="https://www.youtube.com/embed/gESVxTjS2aU?si=j6BrkP7JVrpaUbjv&autoplay=1&mute=1&loop=1&playlist=gESVxTjS2aU&enablejsapi=1" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen style="width: 100%; height: 100%; border: none;"></iframe>
                 <div class="muted-indicator" onclick="event.stopPropagation(); toggleIframeMute(6)">Click to unmute</div>
                 <div class="video-overlay">
                     <div class="video-caption">private jet diaries</div>
@@ -836,8 +230,6 @@
         </div>
         <center><button class="view-all-btn" onclick="showVideosModal()">View All Videos</button></center>
     </section>
-
-    <!-- Feed Section -->
     <section id="feed">
         <h2>Feed</h2>
         <div class="instagram-grid" id="homeFeedGrid">
@@ -988,8 +380,6 @@
         </div>
         <center><button class="view-all-btn" onclick="showFeedModal()">View All Posts</button></center>
     </section>
-
-    <!-- Profile/About -->
     <section id="profile">
         <h2>About Amaia</h2>
         <div class="profile-header">
@@ -1023,8 +413,6 @@
             </p>
         </div>
     </section>
-
-    <!-- Videos Modal -->
     <div id="videosModal" class="modal">
         <div class="modal-header">
             <h2>All Videos</h2>
@@ -1036,12 +424,9 @@
         </div>
         <div class="modal-content">
             <div id="videoViewContainer" class="tiktok-view">
-                <!-- Videos will be populated here -->
             </div>
         </div>
     </div>
-
-    <!-- Feed Modal -->
     <div id="feedModal" class="modal">
         <div class="modal-header">
             <h2>All Posts</h2>
@@ -1051,12 +436,9 @@
         </div>
         <div class="modal-content">
             <div class="instagram-grid" id="feedViewContainer">
-                <!-- Posts will be populated here -->
             </div>
         </div>
     </div>
-
-    <!-- Extended View Modal -->
     <div id="extendedViewModal" class="extended-view-modal">
         <div class="extended-view-container">
             <div class="extended-media" id="extendedMedia"></div>
@@ -1071,21 +453,15 @@
             </div>
         </div>
     </div>
-
-    <!-- Chat Section -->
     <section id="chat-section">
         <h2>Chat with Amaia!</h2>
         <p>Engage with me directly via the widget in the bottom right corner!</p>
         <elevenlabs-convai agent-id="agent_2401k7zqr76sejkt2xcszb3gqy9j"></elevenlabs-convai>
         <script src="https://unpkg.com/@elevenlabs/convai-widget-embed" async type="text/javascript"></script>
     </section>
-
     <script src="https://www.youtube.com/iframe_api"></script>
     <script>
-        // Global array to store player instances
         let players = {};
-
-        // Initialize YouTube Iframe API players when the API is ready
         function onYouTubeIframeAPIReady() {
             const videoIds = [1, 2, 3, 4, 5, 6];
             videoIds.forEach(id => {
@@ -1097,27 +473,15 @@
                 });
             });
         }
-
         function onPlayerReady(event) {
             event.target.playVideo();
         }
-
-        // 1. Fix for YouTube video looping - Replace the onPlayerStateChange function with this:
-
-function onPlayerStateChange(event) {
-    // When video ends, loop it by seeking to start and playing again
-    if (event.data === YT.PlayerState.ENDED) {
-        event.target.seekTo(0);
-        event.target.playVideo();
-    }
-}
-
-        // Navigation
-        function navigateTo(sectionId) {
-            document.getElementById(sectionId).scrollIntoView({ behavior: 'smooth' });
+        function onPlayerStateChange(event) {
+            if (event.data === YT.PlayerState.ENDED) {
+                event.target.seekTo(0);
+                event.target.playVideo();
+            }
         }
-
-        // Toggle iframe mute
         function toggleIframeMute(videoId) {
             const player = players[videoId];
             if (player) {
@@ -1131,8 +495,6 @@ function onPlayerStateChange(event) {
                 }
             }
         }
-
-        // Toggle video like
         function toggleVideoLike(button) {
             button.classList.toggle('liked');
             const countSpan = button.querySelector('span:last-child');
@@ -1144,8 +506,6 @@ function onPlayerStateChange(event) {
             }
             countSpan.textContent = (count / 1000).toFixed(1) + 'K';
         }
-
-        // Toggle post like
         function togglePostLike(button) {
             button.classList.toggle('liked');
             if (button.classList.contains('liked')) {
@@ -1154,30 +514,21 @@ function onPlayerStateChange(event) {
                 button.textContent = '❤️ Like';
             }
         }
-
-        // Show videos modal
         function showVideosModal() {
             document.getElementById('videosModal').classList.add('active');
             populateVideos('tiktok');
         }
-
-        // Show feed modal
         function showFeedModal() {
             document.getElementById('feedModal').classList.add('active');
             populateFeed();
         }
-
-        // Close modal
         function closeModal(modalId) {
             document.getElementById(modalId).classList.remove('active');
         }
-
-        // Switch video view
         function switchVideoView(view) {
             const container = document.getElementById('videoViewContainer');
             const tiktokBtn = document.getElementById('tiktokViewBtn');
             const gridBtn = document.getElementById('gridViewBtn');
-            
             if (view === 'tiktok') {
                 container.className = 'tiktok-view';
                 tiktokBtn.classList.add('active');
@@ -1189,19 +540,16 @@ function onPlayerStateChange(event) {
             }
             populateVideos(view);
         }
-
-        // Populate videos
         function populateVideos(view) {
             const container = document.getElementById('videoViewContainer');
             const videos = [
-                { id: 1, src: 'https://www.youtube.com/embed/m39iD3ivGTQ?si=LcPVE-0K61KKm-i5&autoplay=1&mute=1&loop=1&enablejsapi=1', caption: 'rooftop views in monaco 🌅✨', likes: '234K', comments: '1.2K' },
-                { id: 2, src: 'https://www.youtube.com/embed/xOzHgLnyd0U?si=5rZVSldwjUrTjKJx&autoplay=1&mute=1&loop=1&enablejsapi=1', caption: 'unboxing my new collection', likes: '189K', comments: '892' },
-                { id: 3, src: 'https://www.youtube.com/embed/-3IijttdZSU?si=C4KvL8PY4vV9Lz3j&autoplay=1&mute=1&loop=1&enablejsapi=1', caption: 'sunset cocktails with the city below', likes: '312K', comments: '2.1K' },
-                { id: 4, src: 'https://www.youtube.com/embed/C5q5LxfghNs?si=Qtm4mjy34VAeVckV&autoplay=1&mute=1&loop=1&enablejsapi=1', caption: 'golden hour in paris', likes: '278K', comments: '1.5K' },
-                { id: 5, src: 'https://www.youtube.com/embed/Veq-zroppHA?si=WzdNV8kswZ9rUDsF&autoplay=1&mute=1&loop=1&enablejsapi=1', caption: 'fashion week behind the scenes', likes: '401K', comments: '3.2K' },
-                { id: 6, src: 'https://www.youtube.com/embed/gESVxTjS2aU?si=j6BrkP7JVrpaUbjv&autoplay=1&mute=1&loop=1&enablejsapi=1', caption: 'private jet diaries', likes: '523K', comments: '4.8K' }
+                { id: 1, src: 'https://www.youtube.com/embed/m39iD3ivGTQ?si=LcPVE-0K61KKm-i5&autoplay=1&mute=1&loop=1&playlist=m39iD3ivGTQ&enablejsapi=1', caption: 'rooftop views in monaco 🌅✨', likes: '234K', comments: '1.2K' },
+                { id: 2, src: 'https://www.youtube.com/embed/xOzHgLnyd0U?si=5rZVSldwjUrTjKJx&autoplay=1&mute=1&loop=1&playlist=xOzHgLnyd0U&enablejsapi=1', caption: 'unboxing my new collection', likes: '189K', comments: '892' },
+                { id: 3, src: 'https://www.youtube.com/embed/-3IijttdZSU?si=C4KvL8PY4vV9Lz3j&autoplay=1&mute=1&loop=1&playlist=-3IijttdZSU&enablejsapi=1', caption: 'sunset cocktails with the city below', likes: '312K', comments: '2.1K' },
+                { id: 4, src: 'https://www.youtube.com/embed/C5q5LxfghNs?si=Qtm4mjy34VAeVckV&autoplay=1&mute=1&loop=1&playlist=C5q5LxfghNs&enablejsapi=1', caption: 'golden hour in paris', likes: '278K', comments: '1.5K' },
+                { id: 5, src: 'https://www.youtube.com/embed/Veq-zroppHA?si=WzdNV8kswZ9rUDsF&autoplay=1&mute=1&loop=1&playlist=Veq-zroppHA&enablejsapi=1', caption: 'fashion week behind the scenes', likes: '401K', comments: '3.2K' },
+                { id: 6, src: 'https://www.youtube.com/embed/gESVxTjS2aU?si=j6BrkP7JVrpaUbjv&autoplay=1&mute=1&loop=1&playlist=gESVxTjS2aU&enablejsapi=1', caption: 'private jet diaries', likes: '523K', comments: '4.8K' }
             ];
-
             const videoComments = {
                 1: [
                     { author: '@rooftop_fan', text: 'Amazing view from up there!', likes: 20, amaiaResponse: 'Thanks! The Monaco skyline is unreal. 🌆' },
@@ -1228,10 +576,9 @@ function onPlayerStateChange(event) {
                     { author: '@travel_bug', text: 'Where to next?', likes: 11, amaiaResponse: 'Maybe Tokyo next! ✈️' }
                 ]
             };
-
             container.innerHTML = videos.map(v => `
                 <div class="${view === 'tiktok' ? 'tiktok-video' : 'video-item'}" data-video-id="${v.id}" onclick="showExtendedView(${v.id}, 'video')">
-                    <iframe id="video-${v.id}" src="${v.src}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen style="width: 100%; height: 100%; border: none;"></iframe>
+                    <iframe id="modal-video-${v.id}" src="${v.src}" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen style="width: 100%; height: 100%; border: none;"></iframe>
                     <div class="muted-indicator" onclick="event.stopPropagation(); toggleIframeMute(${v.id})">Click to unmute</div>
                     <div class="video-overlay">
                         <div class="video-caption">${v.caption}</div>
@@ -1246,9 +593,17 @@ function onPlayerStateChange(event) {
                     </div>
                 </div>
             `).join('');
+            videos.forEach(v => {
+                setTimeout(() => {
+                    players[`modal-${v.id}`] = new YT.Player(`modal-video-${v.id}`, {
+                        events: {
+                            'onReady': onPlayerReady,
+                            'onStateChange': onPlayerStateChange
+                        }
+                    });
+                }, 500);
+            });
         }
-
-        // Populate feed
         function populateFeed() {
             const container = document.getElementById('feedViewContainer');
             const posts = [
@@ -1262,7 +617,6 @@ function onPlayerStateChange(event) {
                 { id: 8, src: 'https://i.imgur.com/vdFHn1Z.png', caption: 'The details matter. Perfecting the everyday ritual.' },
                 { id: 9, src: 'https://i.imgur.com/trf16QF.png', caption: 'Capturing moments that feel timeless. What’s your favorite memory?' }
             ];
-
             const comments = {
                 1: [
                     { author: '@fan_user_1', text: 'This is so peaceful! 🌿', likes: 15, amaiaResponse: 'Thank you! It’s my favorite escape. 🌱' },
@@ -1301,7 +655,6 @@ function onPlayerStateChange(event) {
                     { author: '@photo_fan', text: 'Beautiful shot!', likes: 10, amaiaResponse: null }
                 ]
             };
-
             container.innerHTML = posts.map(p => `
                 <div class="instagram-post" data-post-id="${p.id}" onclick="showExtendedView(${p.id}, 'post')">
                     <div class="post-image">
@@ -1321,73 +674,51 @@ function onPlayerStateChange(event) {
                 </div>
             `).join('');
         }
-
-        // 2. Fix for journal entries - Replace the populateJournal function with this:
-
-function populateJournal() {
-    const container = document.getElementById('journalEntries');
-    let journalEntries = JSON.parse(localStorage.getItem('journalEntries')) || [
-        { date: '22 October 2025', content: 'Last night's city lights felt like a love letter to the world. I'm always inspired by the energy of a bustling city. What place makes your heart race? 🏙️' },
-        { date: '21 October 2025', content: 'Spent the day curating a new wardrobe. Less is more—choosing pieces that tell a story. What's one item in your closet you can't live without? 👗' }
-    ];
-
-    // Add new entry if it's a new day
-    const lastDate = localStorage.getItem('lastJournalDate');
-    const today = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
-    
-    if (!lastDate || lastDate !== today) {
-        const newEntry = {
-            date: today,
-            content: `Today, I savoured a peaceful night under the stars, dreaming of new horizons. What inspires you late at night? 🌌`
-        };
-        journalEntries.unshift(newEntry);
-        
-        // Remove duplicate if exists
-        journalEntries = journalEntries.filter((entry, index, self) =>
-            index === self.findIndex((e) => e.date === entry.date)
-        );
-        
-        localStorage.setItem('journalEntries', JSON.stringify(journalEntries));
-        localStorage.setItem('lastJournalDate', today);
-    } else {
-        // Update existing entry with current content if it's the same day (remove date/time from text)
-        journalEntries[0].content = `Today, I savoured a peaceful night under the stars, dreaming of new horizons. What inspires you late at night? 🌌`;
-        localStorage.setItem('journalEntries', JSON.stringify(journalEntries));
-    }
-
-    const journalComments = {
-        '22 October 2025': [
-            { author: '@city_lover', text: 'City energy is unmatched!', likes: 12, amaiaResponse: null },
-            { author: '@night_walker', text: 'Paris for me!', likes: 8, amaiaResponse: 'Paris is magical! 🏙️' }
-        ],
-        '21 October 2025': [
-            { author: '@fashion_curator', text: 'Love the wardrobe focus!', likes: 14, amaiaResponse: null },
-            { author: '@style_seeker', text: 'My favorite is my scarf.', likes: 7, amaiaResponse: null }
-        ],
-        [today]: [
-            { author: '@reflection_fan', text: 'Love your introspective side!', likes: 10, amaiaResponse: 'Thanks! It's my quiet time. 🌿' },
-            { author: '@thoughtful_one', text: 'Great question to ponder.', likes: 6, amaiaResponse: null }
-        ]
-    };
-
-    container.innerHTML = journalEntries.map(j => `
-        <div class="journal-entry">
-            <div class="journal-date">${j.date}</div>
-            <div class="journal-content">${j.content}</div>
-            <div class="journal-actions">
-                <button class="action-btn" onclick="togglePostLike(this)">❤️ Like</button>
-                <button class="action-btn" onclick="showExtendedView('${j.date}', 'journal')">💬 Comment</button>
-            </div>
-        </div>
-    `).join('');
-}
-
-        // Show extended view
+        function populateJournal() {
+            const container = document.getElementById('journalEntries');
+            let journalEntries = JSON.parse(localStorage.getItem('journalEntries')) || [
+                { date: '22 October 2025', content: 'Last night’s city lights felt like a love letter to the world. I’m always inspired by the energy of a bustling city. What place makes your heart race? 🏙️' },
+                { date: '21 October 2025', content: 'Spent the day curating a new wardrobe. Less is more—choosing pieces that tell a story. What’s one item in your closet you can’t live without? 👗' }
+            ];
+            const today = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
+            const newEntryContent = 'Today, I savoured a peaceful night under the stars, dreaming of new horizons. What inspires you late at night? 🌌';
+            const existingTodayEntry = journalEntries.find(entry => entry.date === today);
+            if (existingTodayEntry) {
+                existingTodayEntry.content = newEntryContent;
+            } else {
+                journalEntries.unshift({ date: today, content: newEntryContent });
+            }
+            localStorage.setItem('journalEntries', JSON.stringify(journalEntries));
+            localStorage.setItem('lastJournalDate', today);
+            const journalComments = {
+                '22 October 2025': [
+                    { author: '@city_lover', text: 'City energy is unmatched!', likes: 12, amaiaResponse: null },
+                    { author: '@night_walker', text: 'Paris for me!', likes: 8, amaiaResponse: 'Paris is magical! 🏙️' }
+                ],
+                '21 October 2025': [
+                    { author: '@fashion_curator', text: 'Love the wardrobe focus!', likes: 14, amaiaResponse: null },
+                    { author: '@style_seeker', text: 'My favorite is my scarf.', likes: 7, amaiaResponse: null }
+                ],
+                [today]: [
+                    { author: '@stargazer', text: 'Love the starry night vibe!', likes: 10, amaiaResponse: 'Thanks! The stars are so inspiring. 🌌' },
+                    { author: '@dreamer', text: 'This makes me want to stargaze too!', likes: 6, amaiaResponse: null }
+                ]
+            };
+            container.innerHTML = journalEntries.map(j => `
+                <div class="journal-entry">
+                    <div class="journal-date">${j.date}</div>
+                    <div class="journal-content">${j.content}</div>
+                    <div class="journal-actions">
+                        <button class="action-btn" onclick="togglePostLike(this)">❤️ Like</button>
+                        <button class="action-btn" onclick="showExtendedView('${j.date}', 'journal')">💬 Comment</button>
+                    </div>
+                </div>
+            `).join('');
+        }
         function showExtendedView(id, type) {
             const modal = document.getElementById('extendedViewModal');
             const mediaContainer = document.getElementById('extendedMedia');
             const commentsContainer = document.getElementById('commentsContent');
-            
             let item;
             if (type === 'video') {
                 const videos = [
@@ -1442,7 +773,6 @@ function populateJournal() {
                     </div>
                 `;
             }
-
             const comments = {
                 1: [
                     { author: '@fan_user_1', text: 'This is so peaceful! 🌿', likes: 15, amaiaResponse: 'Thank you! It’s my favorite escape. 🌱' },
@@ -1488,15 +818,13 @@ function populateJournal() {
                     { author: '@fashion_curator', text: 'Love the wardrobe focus!', likes: 14, amaiaResponse: null },
                     { author: '@style_seeker', text: 'My favorite is my scarf.', likes: 7, amaiaResponse: null }
                 ],
-                [new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })]: [
-                    { author: '@reflection_fan', text: 'Love your introspective side!', likes: 10, amaiaResponse: 'Thanks! It’s my quiet time. 🌿' },
-                    { author: '@thoughtful_one', text: 'Great question to ponder.', likes: 6, amaiaResponse: null }
+                ['24 October 2025']: [
+                    { author: '@stargazer', text: 'Love the starry night vibe!', likes: 10, amaiaResponse: 'Thanks! The stars are so inspiring. 🌌' },
+                    { author: '@dreamer', text: 'This makes me want to stargaze too!', likes: 6, amaiaResponse: null }
                 ]
             }[type === 'post' ? id : type === 'video' ? id : id];
-
             const userComments = JSON.parse(localStorage.getItem(`comments_${type}_${type === 'journal' ? `'${id}'` : id}`)) || [];
             const allComments = [...(comments || []), ...userComments];
-
             commentsContainer.innerHTML = allComments.map(c => `
                 <div class="comment">
                     <div class="comment-author">${c.author}</div>
@@ -1512,13 +840,10 @@ function populateJournal() {
                     ` : ''}
                 </div>
             `).join('');
-
             modal.classList.add('active');
             document.getElementById('commentInput').dataset.type = type;
             document.getElementById('commentInput').dataset.id = id;
         }
-
-        // Toggle comment like
         function toggleCommentLike(element, type, id, text) {
             element.classList.toggle('liked');
             const countSpan = element.querySelector('span:last-child');
@@ -1529,7 +854,6 @@ function populateJournal() {
                 count -= 1;
             }
             countSpan.textContent = count;
-
             const userComments = JSON.parse(localStorage.getItem(`comments_${type}_${id}`)) || [];
             const comment = userComments.find(c => c.text === text);
             if (comment) {
@@ -1537,23 +861,21 @@ function populateJournal() {
                 localStorage.setItem(`comments_${type}_${id}`, JSON.stringify(userComments));
             }
         }
-
-        // Submit comment
         function submitComment() {
             const input = document.getElementById('commentInput');
             const type = input.dataset.type;
             const id = input.dataset.id;
             const text = input.value.trim();
             if (!text) return;
-
             const userComments = JSON.parse(localStorage.getItem(`comments_${type}_${id}`)) || [];
             userComments.push({ author: '@you', text, likes: 0 });
             localStorage.setItem(`comments_${type}_${id}`, JSON.stringify(userComments));
             input.value = '';
             showExtendedView(id, type);
         }
-
-        // Auto-play videos on scroll (muted)
+        function navigateTo(sectionId) {
+            document.getElementById(sectionId).scrollIntoView({ behavior: 'smooth' });
+        }
         document.addEventListener('DOMContentLoaded', function() {
             populateJournal();
             const observer = new IntersectionObserver((entries) => {
