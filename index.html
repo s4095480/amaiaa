@@ -35,6 +35,8 @@
             backdrop-filter: blur(10px);
             border-bottom: 1px solid rgba(255, 0, 255, 0.2);
             z-index: 1000;
+            display: flex;
+            justify-content: center;
         }
 
         nav .container {
@@ -45,6 +47,7 @@
             justify-content: space-between;
             align-items: center;
             height: 70px;
+            width: 100%;
         }
 
         nav .logo {
@@ -218,8 +221,8 @@
         .video-feed {
             display: flex;
             flex-direction: column;
-            gap: 32px;
-            max-width: 600px;
+            gap: 24px;
+            max-width: 400px;
             margin: 0 auto;
         }
 
@@ -247,7 +250,7 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 64px;
+            font-size: 48px;
         }
 
         .video-overlay {
@@ -255,7 +258,7 @@
             bottom: 0;
             left: 0;
             right: 0;
-            padding: 20px;
+            padding: 16px;
             background: linear-gradient(transparent, rgba(0, 0, 0, 0.8));
         }
 
@@ -267,8 +270,8 @@
 
         .video-actions {
             display: flex;
-            gap: 16px;
-            font-size: 14px;
+            gap: 12px;
+            font-size: 12px;
         }
 
         .video-action {
@@ -292,12 +295,12 @@
 
         .muted-indicator {
             position: absolute;
-            top: 16px;
-            right: 16px;
+            top: 12px;
+            right: 12px;
             background: rgba(0, 0, 0, 0.7);
-            padding: 8px 12px;
-            border-radius: 8px;
-            font-size: 12px;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 10px;
             color: #00FFFF;
         }
 
@@ -330,11 +333,11 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 64px;
+            font-size: 48px;
         }
 
         .post-content {
-            padding: 20px;
+            padding: 16px;
         }
 
         .post-header {
@@ -365,7 +368,7 @@
 
         .post-actions {
             display: flex;
-            gap: 16px;
+            gap: 12px;
             padding-top: 12px;
             border-top: 1px solid rgba(255, 255, 255, 0.1);
         }
@@ -375,7 +378,7 @@
             border: none;
             color: #00FFFF;
             cursor: pointer;
-            font-size: 14px;
+            font-size: 12px;
             font-weight: 500;
             transition: all 0.3s;
         }
@@ -470,8 +473,8 @@
         .tiktok-view {
             display: flex;
             flex-direction: column;
-            gap: 32px;
-            max-width: 600px;
+            gap: 24px;
+            max-width: 400px;
             margin: 0 auto;
         }
 
@@ -665,6 +668,15 @@
             z-index: 1000;
         }
 
+        /* Chat Section */
+        #chat-section {
+            text-align: center;
+            padding: 40px 0;
+            background: rgba(255, 255, 255, 0.03);
+            border-top: 1px solid rgba(255, 0, 255, 0.2);
+            margin-top: 40px;
+        }
+
         /* Mobile Responsive */
         @media (max-width: 768px) {
             nav ul {
@@ -691,6 +703,14 @@
             .extended-media, .extended-comments {
                 max-width: 100%;
             }
+
+            .video-feed {
+                max-width: 300px;
+            }
+
+            .tiktok-view {
+                max-width: 300px;
+            }
         }
     </style>
 </head>
@@ -714,8 +734,8 @@
         <div class="hero-content">
             <h1>AMAIA VOSS</h1>
             <p>Luxury Lifestyle • AI Celebrity • Your Digital Muse</p>
-            <button class="cta-button" onclick="navigateTo('journal')">
-                Read My Journal
+            <button class="cta-button" onclick="navigateTo('chat-section')">
+                Chat to Amaia
             </button>
         </div>
     </section>
@@ -770,7 +790,7 @@
     <!-- Feed Section -->
     <section id="feed">
         <h2>Feed</h2>
-        <div class="instagram-grid">
+        <div class="instagram-grid" id="homeFeedGrid">
             <div class="instagram-post" data-post-id="1" onclick="showExtendedView(1, 'post')">
                 <div class="post-image">✨</div>
                 <div class="post-content">
@@ -796,6 +816,20 @@
                     <div class="post-actions">
                         <button class="action-btn" onclick="event.stopPropagation(); togglePostLike(this)">❤️ Like</button>
                         <button class="action-btn" onclick="event.stopPropagation(); showExtendedView(2, 'post')">💬 Comment</button>
+                    </div>
+                </div>
+            </div>
+            <div class="instagram-post" data-post-id="3" onclick="showExtendedView(3, 'post')">
+                <div class="post-image">👗</div>
+                <div class="post-content">
+                    <div class="post-header">
+                        <div class="post-avatar"></div>
+                        <span class="post-username">@amaiavoss</span>
+                    </div>
+                    <p class="post-caption">New season, new wardrobe. Minimalism meets elegance. 🤍</p>
+                    <div class="post-actions">
+                        <button class="action-btn" onclick="event.stopPropagation(); togglePostLike(this)">❤️ Like</button>
+                        <button class="action-btn" onclick="event.stopPropagation(); showExtendedView(3, 'post')">💬 Comment</button>
                     </div>
                 </div>
             </div>
@@ -886,8 +920,16 @@
         </div>
     </div>
 
+    <!-- Chat Section -->
+    <section id="chat-section">
+        <h2>Chat with Amaia!</h2>
+        <p style="color: rgba(255, 255, 255, 0.6); margin: 16px 0;">Click on the widget in the bottom right corner to chat to Amaia!</p>
+        <elevenlabs-convai agent-id="agent_2401k7zqr76sejkt2xcszb3gqy9j"></elevenlabs-convai>
+        <script src="https://unpkg.com/@elevenlabs/convai-widget-embed" async type="text/javascript"></script>
+    </section>
+
     <!-- Call Widget -->
-    <div class="call-widget" onclick="alert('Call Amaia feature coming soon!')">Call Amaia 📞</div>
+    <div class="call-widget" onclick="alert('Chat with Amaia via the widget!')">Chat to Amaia 📞</div>
 
     <script>
         // Navigation
@@ -1030,11 +1072,23 @@
         // Populate journal
         function populateJournal() {
             const container = document.getElementById('journalEntries');
-            const journalEntries = [
-                { date: 'October 23, 2025', content: 'Today I wandered through a quiet rooftop garden in Paris, sipping coffee as the sun rose. It’s these moments that remind me to stay grounded, even in a digital world. What’s your favorite morning ritual? ☕' },
+            let journalEntries = JSON.parse(localStorage.getItem('journalEntries')) || [
                 { date: 'October 22, 2025', content: 'Last night’s city lights felt like a love letter to the world. I’m always inspired by the energy of a bustling city. What place makes your heart race? 🏙️' },
                 { date: 'October 21, 2025', content: 'Spent the day curating a new wardrobe. Less is more—choosing pieces that tell a story. What’s one item in your closet you can’t live without? 👗' }
             ];
+
+            // Add new entry if it's a new day
+            const lastDate = localStorage.getItem('lastJournalDate');
+            const today = new Date().toLocaleDateString();
+            if (!lastDate || lastDate !== today) {
+                const newEntry = {
+                    date: today,
+                    content: `Today at ${new Date().toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit', hour12: true })} AEDT, I enjoyed a quiet moment reflecting on my journey. What’s your favorite way to unwind? 🌿`
+                };
+                journalEntries.unshift(newEntry);
+                localStorage.setItem('journalEntries', JSON.stringify(journalEntries));
+                localStorage.setItem('lastJournalDate', today);
+            }
 
             container.innerHTML = journalEntries.map(j => `
                 <div class="journal-entry">
@@ -1091,11 +1145,7 @@
                     </div>
                 `;
             } else if (type === 'journal') {
-                const journalEntries = [
-                    { date: 'October 23, 2025', content: 'Today I wandered through a quiet rooftop garden in Paris, sipping coffee as the sun rose. It’s these moments that remind me to stay grounded, even in a digital world. What’s your favorite morning ritual? ☕' },
-                    { date: 'October 22, 2025', content: 'Last night’s city lights felt like a love letter to the world. I’m always inspired by the energy of a bustling city. What place makes your heart race? 🏙️' },
-                    { date: 'October 21, 2025', content: 'Spent the day curating a new wardrobe. Less is more—choosing pieces that tell a story. What’s one item in your closet you can’t live without? 👗' }
-                ];
+                const journalEntries = JSON.parse(localStorage.getItem('journalEntries')) || [];
                 item = journalEntries.find(j => j.date === id);
                 mediaContainer.innerHTML = `
                     <div class="journal-entry" style="aspect-ratio: auto; padding: 24px;">
@@ -1122,7 +1172,7 @@
                 <div class="comment">
                     <div class="comment-author">${c.author}</div>
                     <div class="comment-text">${c.text}</div>
-                    <div class="comment-likes" onclick="toggleCommentLike(this, '${type}', ${id}, '${c.text}')">
+                    <div class="comment-likes" onclick="toggleCommentLike(this, '${type}', ${type === 'journal' ? `'${id}'` : id}, '${c.text}')">
                         <span>❤️</span> <span>${c.likes || 0}</span>
                     </div>
                     ${c.amaiaResponse ? `
@@ -1203,7 +1253,9 @@
 
         // Ensure nav bar stays visible
         window.addEventListener('scroll', () => {
-            document.querySelector('nav').style.display = 'block';
+            const nav = document.querySelector('nav');
+            nav.style.display = 'flex';
+            nav.style.position = 'fixed';
         });
     </script>
 </body>
