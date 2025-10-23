@@ -402,7 +402,7 @@
             background: rgba(10, 15, 28, 0.98);
             z-index: 2000;
             overflow-y: auto;
-            padding-top: 70px;
+            padding-top: 0;
         }
 
         .modal.active {
@@ -411,7 +411,7 @@
 
         .modal-header {
             position: fixed;
-            top: 70px;
+            top: 0;
             left: 0;
             right: 0;
             background: rgba(10, 15, 28, 0.95);
@@ -422,6 +422,7 @@
             justify-content: space-between;
             align-items: center;
             z-index: 2001;
+            height: 70px;
         }
 
         .modal-header h2 {
@@ -466,7 +467,7 @@
         .modal-content {
             max-width: 1200px;
             margin: 0 auto;
-            padding: 120px 24px 100px;
+            padding: 70px 24px 100px;
         }
 
         /* TikTok Style View */
@@ -653,23 +654,12 @@
             color: rgba(255, 255, 255, 0.8);
         }
 
-        /* Call Widget */
-        .call-widget {
-            position: fixed;
-            bottom: 24px;
-            right: 24px;
-            background: linear-gradient(135deg, #FF00FF, #7B2CBF);
-            padding: 12px 24px;
-            border-radius: 50px;
-            color: #FFFFFF;
-            font-weight: 600;
-            cursor: pointer;
-            box-shadow: 0 4px 20px rgba(255, 0, 255, 0.4);
-            z-index: 1000;
-        }
-
         /* Chat Section */
         #chat-section {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
             text-align: center;
             padding: 40px 0;
             background: rgba(255, 255, 255, 0.03);
@@ -710,6 +700,10 @@
 
             .tiktok-view {
                 max-width: 300px;
+            }
+
+            #chat-section {
+                min-height: 50vh;
             }
         }
     </style>
@@ -923,13 +917,10 @@
     <!-- Chat Section -->
     <section id="chat-section">
         <h2>Chat with Amaia!</h2>
-        <p style="color: rgba(255, 255, 255, 0.6); margin: 16px 0;">Click on the widget in the bottom right corner to chat to Amaia!</p>
+        <p style="color: rgba(255, 255, 255, 0.6); margin: 16px 0;">Interact with me directly through the widget below!</p>
         <elevenlabs-convai agent-id="agent_2401k7zqr76sejkt2xcszb3gqy9j"></elevenlabs-convai>
         <script src="https://unpkg.com/@elevenlabs/convai-widget-embed" async type="text/javascript"></script>
     </section>
-
-    <!-- Call Widget -->
-    <div class="call-widget" onclick="alert('Chat with Amaia via the widget!')">Chat to Amaia 📞</div>
 
     <script>
         // Navigation
@@ -1019,6 +1010,8 @@
 
             container.innerHTML = videos.map(v => `
                 <div class="${view === 'tiktok' ? 'tiktok-video' : 'video-item'}" onclick="showExtendedView(${v.id}, 'video')">
+                    <!-- Replace the video-placeholder with your video element here, e.g.: -->
+                    <!-- <video controls muted><source src="path/to/your/video.mp4" type="video/mp4"></video> -->
                     <div class="video-placeholder">${v.emoji}</div>
                     <div class="muted-indicator">Click to unmute</div>
                     <div class="video-overlay">
@@ -1051,8 +1044,49 @@
                 { id: 9, emoji: '📸', caption: 'Capturing moments that feel timeless. What\'s your favorite memory?' }
             ];
 
+            const comments = {
+                1: [
+                    { author: '@fan_user_1', text: 'This is so peaceful! 🌿', likes: 15, amaiaResponse: 'Thank you! It’s my favorite escape. 🌱' },
+                    { author: '@luxury_lover', text: 'Where is this spot?', likes: 8, amaiaResponse: null }
+                ],
+                2: [
+                    { author: '@city_dreamer', text: 'Love the night vibes! 🌃', likes: 12, amaiaResponse: null },
+                    { author: '@night_owl', text: 'Can’t get enough of this view!', likes: 7, amaiaResponse: 'Glad you love it! It’s magical at night. ✨' }
+                ],
+                3: [
+                    { author: '@fashionista', text: 'That outfit is stunning! 👗', likes: 20, amaiaResponse: null },
+                    { author: '@style_guru', text: 'Minimalism done right!', likes: 10, amaiaResponse: null }
+                ],
+                4: [
+                    { author: '@grateful_soul', text: 'Grateful for my family today! 🥰', likes: 14, amaiaResponse: null },
+                    { author: '@happy_me', text: 'Such a great reminder!', likes: 9, amaiaResponse: 'So sweet! Family is everything. 💕' }
+                ],
+                5: [
+                    { author: '@wellness_fan', text: 'Self-care is key! 🌸', likes: 11, amaiaResponse: null },
+                    { author: '@relaxed_mind', text: 'Love this philosophy!', likes: 6, amaiaResponse: null }
+                ],
+                6: [
+                    { author: '@shopaholic', text: 'Quality over quantity for sure! 🛍️', likes: 13, amaiaResponse: null },
+                    { author: '@sustainable_style', text: 'Great choice!', likes: 8, amaiaResponse: 'Thanks! Sustainability matters. 🌿' }
+                ],
+                7: [
+                    { author: '@beach_bum', text: 'Paradise! 🏝️', likes: 16, amaiaResponse: null },
+                    { author: '@island_hopper', text: 'Need to visit there!', likes: 7, amaiaResponse: null }
+                ],
+                8: [
+                    { author: '@beauty_queen', text: 'Those details are perfect! 💄', likes: 12, amaiaResponse: null },
+                    { author: '@makeup_maven', text: 'Inspiring as always!', likes: 9, amaiaResponse: 'Thank you, darling! 💋' }
+                ],
+                9: [
+                    { author: '@memory_keeper', text: 'My favorite memory is with my dog! 📸', likes: 15, amaiaResponse: null },
+                    { author: '@photo_fan', text: 'Beautiful shot!', likes: 10, amaiaResponse: null }
+                ]
+            };
+
             container.innerHTML = posts.map(p => `
                 <div class="instagram-post" data-post-id="${p.id}" onclick="showExtendedView(${p.id}, 'post')">
+                    <!-- Replace the post-image with your image element here, e.g.: -->
+                    <!-- <img src="path/to/your/image.jpg" alt="${p.caption}" class="post-image"> -->
                     <div class="post-image">${p.emoji}</div>
                     <div class="post-content">
                         <div class="post-header">
@@ -1073,13 +1107,14 @@
         function populateJournal() {
             const container = document.getElementById('journalEntries');
             let journalEntries = JSON.parse(localStorage.getItem('journalEntries')) || [
-                { date: 'October 22, 2025', content: 'Last night’s city lights felt like a love letter to the world. I’m always inspired by the energy of a bustling city. What place makes your heart race? 🏙️' },
-                { date: 'October 21, 2025', content: 'Spent the day curating a new wardrobe. Less is more—choosing pieces that tell a story. What’s one item in your closet you can’t live without? 👗' }
+                { date: '23 October 2025', content: 'Today at 04:16 PM AEDT, I enjoyed a quiet moment reflecting on my journey. What’s your favorite way to unwind? 🌿' },
+                { date: '22 October 2025', content: 'Last night’s city lights felt like a love letter to the world. I’m always inspired by the energy of a bustling city. What place makes your heart race? 🏙️' },
+                { date: '21 October 2025', content: 'Spent the day curating a new wardrobe. Less is more—choosing pieces that tell a story. What’s one item in your closet you can’t live without? 👗' }
             ];
 
             // Add new entry if it's a new day
             const lastDate = localStorage.getItem('lastJournalDate');
-            const today = new Date().toLocaleDateString();
+            const today = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' });
             if (!lastDate || lastDate !== today) {
                 const newEntry = {
                     date: today,
@@ -1088,6 +1123,10 @@
                 journalEntries.unshift(newEntry);
                 localStorage.setItem('journalEntries', JSON.stringify(journalEntries));
                 localStorage.setItem('lastJournalDate', today);
+            } else {
+                // Update existing entry with current time if it's the same day
+                journalEntries[0].content = `Today at ${new Date().toLocaleTimeString('en-AU', { hour: '2-digit', minute: '2-digit', hour12: true })} AEDT, I enjoyed a quiet moment reflecting on my journey. What’s your favorite way to unwind? 🌿`;
+                localStorage.setItem('journalEntries', JSON.stringify(journalEntries));
             }
 
             container.innerHTML = journalEntries.map(j => `
@@ -1120,6 +1159,8 @@
                 ];
                 item = videos.find(v => v.id === id);
                 mediaContainer.innerHTML = `
+                    <!-- Replace the post-image with your video element here, e.g.: -->
+                    <!-- <video controls muted><source src="path/to/your/video.mp4" type="video/mp4"></video> -->
                     <div class="post-image">${item.emoji}</div>
                     <div class="video-overlay">
                         <div class="video-caption">${item.caption}</div>
@@ -1139,6 +1180,8 @@
                 ];
                 item = posts.find(p => p.id === id);
                 mediaContainer.innerHTML = `
+                    <!-- Replace the post-image with your image element here, e.g.: -->
+                    <!-- <img src="path/to/your/image.jpg" alt="${item.caption}" class="post-image"> -->
                     <div class="post-image">${item.emoji}</div>
                     <div class="video-overlay">
                         <div class="video-caption">${item.caption}</div>
@@ -1156,17 +1199,48 @@
             }
 
             // Load comments
-            const comments = [
-                { author: '@fan_user_1', text: 'This is absolutely stunning! 😍', likes: 12, amaiaResponse: null },
-                { author: '@luxury_lover', text: 'I need to know where this is!!', likes: 8, amaiaResponse: type === 'post' && id === 1 ? 'This was at a private rooftop in Monaco! Wish you could see the view in person! ✨' : null },
-                { author: '@aspiring_influencer', text: 'You inspire me every day ✨', likes: 15, amaiaResponse: null },
-                { author: '@style_icon', text: 'The aesthetic is unmatched', likes: 10, amaiaResponse: null },
-                { author: '@amaia_stan', text: 'Queen behavior 👑', likes: 20, amaiaResponse: type === 'video' && id === 2 ? 'Thank you, my royal court! 😘' : null }
-            ];
+            const comments = {
+                1: [
+                    { author: '@fan_user_1', text: 'This is so peaceful! 🌿', likes: 15, amaiaResponse: 'Thank you! It’s my favorite escape. 🌱' },
+                    { author: '@luxury_lover', text: 'Where is this spot?', likes: 8, amaiaResponse: null }
+                ],
+                2: [
+                    { author: '@city_dreamer', text: 'Love the night vibes! 🌃', likes: 12, amaiaResponse: null },
+                    { author: '@night_owl', text: 'Can’t get enough of this view!', likes: 7, amaiaResponse: 'Glad you love it! It’s magical at night. ✨' }
+                ],
+                3: [
+                    { author: '@fashionista', text: 'That outfit is stunning! 👗', likes: 20, amaiaResponse: null },
+                    { author: '@style_guru', text: 'Minimalism done right!', likes: 10, amaiaResponse: null }
+                ],
+                4: [
+                    { author: '@grateful_soul', text: 'Grateful for my family today! 🥰', likes: 14, amaiaResponse: null },
+                    { author: '@happy_me', text: 'Such a great reminder!', likes: 9, amaiaResponse: 'So sweet! Family is everything. 💕' }
+                ],
+                5: [
+                    { author: '@wellness_fan', text: 'Self-care is key! 🌸', likes: 11, amaiaResponse: null },
+                    { author: '@relaxed_mind', text: 'Love this philosophy!', likes: 6, amaiaResponse: null }
+                ],
+                6: [
+                    { author: '@shopaholic', text: 'Quality over quantity for sure! 🛍️', likes: 13, amaiaResponse: null },
+                    { author: '@sustainable_style', text: 'Great choice!', likes: 8, amaiaResponse: 'Thanks! Sustainability matters. 🌿' }
+                ],
+                7: [
+                    { author: '@beach_bum', text: 'Paradise! 🏝️', likes: 16, amaiaResponse: null },
+                    { author: '@island_hopper', text: 'Need to visit there!', likes: 7, amaiaResponse: null }
+                ],
+                8: [
+                    { author: '@beauty_queen', text: 'Those details are perfect! 💄', likes: 12, amaiaResponse: null },
+                    { author: '@makeup_maven', text: 'Inspiring as always!', likes: 9, amaiaResponse: 'Thank you, darling! 💋' }
+                ],
+                9: [
+                    { author: '@memory_keeper', text: 'My favorite memory is with my dog! 📸', likes: 15, amaiaResponse: null },
+                    { author: '@photo_fan', text: 'Beautiful shot!', likes: 10, amaiaResponse: null }
+                ]
+            }[type === 'post' ? id : 'journal'];
 
             // Load user comments from localStorage
-            const userComments = JSON.parse(localStorage.getItem(`comments_${type}_${id}`)) || [];
-            const allComments = [...comments, ...userComments];
+            const userComments = JSON.parse(localStorage.getItem(`comments_${type}_${type === 'journal' ? `'${id}'` : id}`)) || [];
+            const allComments = [...(comments || []), ...userComments];
 
             commentsContainer.innerHTML = allComments.map(c => `
                 <div class="comment">
